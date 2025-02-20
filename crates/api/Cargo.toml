@@ -1,0 +1,13 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lambda_http = { version = "0.13.0", default-features = false, features = ["apigw_http", "tracing"] }
+tokio = { version = "1", features = ["macros"] }
+
+axum = "0.8.1"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
+tower-http = { version = "0.6.2", features = ["cors"] }

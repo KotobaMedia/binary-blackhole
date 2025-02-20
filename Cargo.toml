@@ -1,0 +1,8 @@
+[workspace]
+package.license = "MIT"
+package.authors = [
+  "Keitaroh Kobayashi <keita@kotobamedia.com>"
+]
+members = [
+  "crates/api",
+]
