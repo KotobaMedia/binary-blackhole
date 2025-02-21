@@ -1,10 +1,10 @@
 use axum::extract::Query;
 use axum::http::{Method, StatusCode};
 use axum::routing::get;
-use axum::{extract::Path, response::Json, Router};
-use lambda_http::{run, tracing, Error};
+use axum::{Router, extract::Path, response::Json};
+use lambda_http::{Error, run, tracing};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Deserialize, Serialize)]
