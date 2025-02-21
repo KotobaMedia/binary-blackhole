@@ -1,0 +1,18 @@
+[package]
+name = "chatter"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+async-openai = "0.27.2"
+derive_builder = "0.20.2"
+geo-types = "0.6"
+schemars = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = "1"
+tokio-postgres = { version = "0.7", features = ["with-geo-types-0_6", "with-serde_json-1"] }
+ulid = "1.2.0"

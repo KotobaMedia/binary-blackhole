@@ -1,8 +1,10 @@
 [workspace]
+resolver = "3"
+
 package.license = "MIT"
 package.authors = [
   "Keitaroh Kobayashi <keita@kotobamedia.com>"
 ]
 members = [
-  "crates/api",
+  "crates/api", "crates/chatter",
 ]
