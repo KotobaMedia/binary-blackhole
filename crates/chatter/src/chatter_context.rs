@@ -1,6 +1,63 @@
-use async_openai::types::ChatCompletionRequestMessage;
+use crate::error::Result;
+use async_openai::types::{ChatCompletionTool, Role};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Default)]
+use crate::{
+    chatter_message::ChatterMessage,
+    functions::{describe_tables_tool, query_database_tool},
+};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChatterContext {
-    pub messages: Vec<ChatCompletionRequestMessage>,
+    pub messages: Vec<ChatterMessage>,
+    pub model: String,
+    pub tools: Vec<ChatCompletionTool>,
+}
+
+impl ChatterContext {
+    pub async fn new(client: &tokio_postgres::Client) -> Result<Self> {
+        let mut tables: String = String::new();
+        let rows = client
+            .query(
+                r#"
+                    SELECT
+                        "table_name",
+                        "metadata"->'data_item'->>'name' AS "name"
+                    FROM "datasets";
+                "#,
+                &[],
+            )
+            .await?;
+        for row in rows {
+            let table_name: String = row.get(0);
+            let name: String = row.get(1);
+            tables.push_str(&format!("- `{}`: {}\n", table_name, name));
+        }
+
+        Ok(Self {
+            messages: vec![ChatterMessage {
+                message: Some(
+                    format!(include_str!("../data/system_prompt_01.txt"), tables).to_string(),
+                ),
+                role: Role::System,
+                tool_calls: None,
+                tool_call_id: None,
+            }],
+            model: "gpt-4o".to_string(),
+            tools: vec![describe_tables_tool(), query_database_tool()],
+        })
+    }
+
+    pub fn add_message(&mut self, message: ChatterMessage) {
+        self.messages.push(message);
+    }
+
+    pub fn add_user_message(&mut self, message: &str) {
+        self.add_message(ChatterMessage {
+            message: Some(message.to_string()),
+            tool_calls: None,
+            role: Role::User,
+            tool_call_id: None,
+        });
+    }
 }
