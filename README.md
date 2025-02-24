@@ -4,5 +4,5 @@
 
 # Info
 
-* TypeScript packages live in `packages/*`. `pnpm` workspaces are utilized.
+* TypeScript packages live in `packages/*`. `pnpm` workspaces are utilized. Use `corepack prepare --activate` to get started.
 * Rust crates live in `crates/*`. Add new crates with `cargo new crates/<name> --(bin|lib)`.
