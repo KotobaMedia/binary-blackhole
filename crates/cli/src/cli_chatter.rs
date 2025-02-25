@@ -4,12 +4,14 @@ use dialoguer::Input;
 
 pub struct CliChatter {
     chatter: Chatter,
+    show_messages: bool,
 }
 
 impl CliChatter {
-    pub async fn new() -> Result<Self> {
+    pub async fn new(show_messages: bool) -> Result<Self> {
         Ok(Self {
             chatter: Chatter::new().await?,
+            show_messages,
         })
     }
 
@@ -27,6 +29,12 @@ impl CliChatter {
         // println!("You said: {}", msg);
         self.chatter.context.add_user_message(&msg);
         let response = self.chatter.execute().await?;
+
+        if self.show_messages {
+            self.chatter.context.messages.iter().for_each(|m| {
+                println!("{}: {:?}", m.role, m);
+            });
+        }
 
         if let Some(content) = response.content {
             println!("→ {}", content);

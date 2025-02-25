@@ -5,15 +5,21 @@ use async_openai::types::{
     ChatCompletionRequestToolMessageArgs, ChatCompletionRequestUserMessageArgs,
     ChatCompletionResponseMessage, Role,
 };
-use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize, Builder)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ChatterMessageSidecar {
+    None,
+    SQLExecution((String, String)),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChatterMessage {
     pub message: Option<String>,
     pub role: Role,
     pub tool_calls: Option<Vec<ChatCompletionMessageToolCall>>,
     pub tool_call_id: Option<String>,
+    pub sidecar: ChatterMessageSidecar,
 }
 
 impl TryFrom<ChatCompletionResponseMessage> for ChatterMessage {
@@ -25,6 +31,7 @@ impl TryFrom<ChatCompletionResponseMessage> for ChatterMessage {
             role: message.role,
             tool_calls: message.tool_calls,
             tool_call_id: None,
+            sidecar: ChatterMessageSidecar::None,
         })
     }
 }

@@ -1,24 +1,29 @@
-use std::env;
+use std::{env, sync::Arc};
 
-use crate::{chatter_context::ChatterContext, error::Result, functions};
+use crate::{
+    chatter_context::ChatterContext,
+    error::Result,
+    functions::{ExecutionContext, ExecutionContextBuilder},
+};
 use async_openai::types::{
     ChatCompletionMessageToolCall, ChatCompletionRequestMessage, ChatCompletionResponseMessage,
     CreateChatCompletionRequestArgs,
 };
 use tokio_postgres::NoTls;
 
-// #[derive(Builder)]
-// #[builder(pattern = "owned")]
 pub struct Chatter {
     pub context: ChatterContext,
     pub client: async_openai::Client<async_openai::config::OpenAIConfig>,
-    pub pg_client: tokio_postgres::Client,
+    pub pg_client: Arc<tokio_postgres::Client>,
+
+    func_ctx: ExecutionContext,
 }
 
 impl Chatter {
     pub async fn new() -> Result<Self> {
         let config = env::var("POSTGRES_CONN_STR")?;
         let (client, connection) = tokio_postgres::connect(&config, NoTls).await?;
+        let client = Arc::new(client);
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -26,10 +31,15 @@ impl Chatter {
             }
         });
 
+        let func_ctx = ExecutionContextBuilder::default()
+            .client(client.clone())
+            .build()?;
+
         Ok(Self {
             context: ChatterContext::new(&client).await?,
             client: async_openai::Client::new(),
             pg_client: client,
+            func_ctx,
         })
     }
 
@@ -72,12 +82,12 @@ impl Chatter {
         let response = match call.name.as_str() {
             "describe_tables" => {
                 let args = serde_json::from_str(&call.arguments)?;
-                let response = functions::describe_tables(&self.pg_client, &id, args).await?;
+                let response = self.func_ctx.describe_tables(&id, args).await?;
                 response.into()
             }
             "query_database" => {
                 let args = serde_json::from_str(&call.arguments)?;
-                let response = functions::query_database(&self.pg_client, &id, args).await?;
+                let response = self.func_ctx.query_database(&id, args).await?;
                 response.into()
             }
             other => {

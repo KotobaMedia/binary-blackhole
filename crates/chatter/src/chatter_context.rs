@@ -1,14 +1,14 @@
-use crate::error::Result;
+use crate::{chatter_message::ChatterMessageSidecar, error::Result};
 use async_openai::types::{ChatCompletionTool, Role};
 use serde::{Deserialize, Serialize};
+use ulid::Ulid;
 
-use crate::{
-    chatter_message::ChatterMessage,
-    functions::{describe_tables_tool, query_database_tool},
-};
+use crate::{chatter_message::ChatterMessage, functions::ExecutionContext};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChatterContext {
+    /// A unique identifier for this context. Use this to track context and conversation history.
+    pub id: String,
     pub messages: Vec<ChatterMessage>,
     pub model: String,
     pub tools: Vec<ChatCompletionTool>,
@@ -35,6 +35,7 @@ impl ChatterContext {
         }
 
         Ok(Self {
+            id: Ulid::new().to_string(),
             messages: vec![ChatterMessage {
                 message: Some(
                     format!(include_str!("../data/system_prompt_01.txt"), tables).to_string(),
@@ -42,9 +43,13 @@ impl ChatterContext {
                 role: Role::System,
                 tool_calls: None,
                 tool_call_id: None,
+                sidecar: ChatterMessageSidecar::None,
             }],
             model: "gpt-4o".to_string(),
-            tools: vec![describe_tables_tool(), query_database_tool()],
+            tools: vec![
+                ExecutionContext::describe_tables_tool(),
+                ExecutionContext::query_database_tool(),
+            ],
         })
     }
 
@@ -58,6 +63,7 @@ impl ChatterContext {
             tool_calls: None,
             role: Role::User,
             tool_call_id: None,
+            sidecar: ChatterMessageSidecar::None,
         });
     }
 }

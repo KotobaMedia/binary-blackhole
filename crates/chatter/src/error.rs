@@ -11,6 +11,9 @@ pub enum ChatterError {
     #[error("JSON Serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
 
+    #[error("Failed to create function execution context failed: {0}")]
+    ExecutionContextBuilderError(#[from] crate::functions::ExecutionContextBuilderError),
+
     #[error("Unknown Tool Call: {0}")]
     UnknownToolCall(String),
     #[error("Unknown Role: {0}")]
