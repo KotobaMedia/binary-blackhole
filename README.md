@@ -13,3 +13,4 @@ Frontend on [http://localhost:5173](http://localhost:5173) and backend on :9000.
 
 * TypeScript packages live in `packages/*`. `pnpm` workspaces are utilized. Use `corepack prepare --activate` to get started.
 * Rust crates live in `crates/*`. Add new crates with `cargo new crates/<name> --(bin|lib)`.
+    * `cargo test` assumes DynamoDB Local is running. Start it with `pnpm dev`
