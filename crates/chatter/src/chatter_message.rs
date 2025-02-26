@@ -3,9 +3,11 @@ use async_openai::types::{
     ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessageArgs,
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
     ChatCompletionRequestToolMessageArgs, ChatCompletionRequestUserMessageArgs,
-    ChatCompletionResponseMessage, Role,
+    ChatCompletionResponseMessage, Role as OpenAIRole,
 };
 use serde::{Deserialize, Serialize};
+
+pub type Role = OpenAIRole;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ChatterMessageSidecar {

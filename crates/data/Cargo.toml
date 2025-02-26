@@ -1,0 +1,21 @@
+[package]
+name = "data"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+chatter = { path = "../chatter" }
+
+thiserror = "2"
+
+tokio = { version = "1", features = ["full"] }
+
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-dynamodb = "1"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
+derive_builder = "0.20"
