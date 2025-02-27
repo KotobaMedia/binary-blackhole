@@ -21,7 +21,7 @@ function getDynamoDBCommand() {
     }
 
     // Container doesn't exist, need to create a new one
-    return `docker run --name ${DDB_CONT} -p 8000:8000 amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -sharedDb`;
+    return `docker run --name ${DDB_CONT} -p 9001:8000 amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -sharedDb`;
   } catch (error) {
     console.error('Error checking Docker container status:', error);
     // If there's an error, return a command that will fail gracefully

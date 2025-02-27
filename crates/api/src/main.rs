@@ -3,17 +3,14 @@ use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::get;
 use lambda_http::{Error, run, tracing};
-use serde::{Deserialize, Serialize};
+use state::AppState;
 use tower_http::cors::{Any, CorsLayer};
 
-#[derive(Deserialize, Serialize)]
-struct Params {
-    first: Option<String>,
-    second: Option<String>,
-}
+mod state;
+mod threads;
 
 async fn root() -> Redirect {
-    Redirect::temporary("https://bblackhole.com/")
+    Redirect::temporary("https://www.bblackhole.com/")
 }
 async fn health() -> String {
     "OK".to_string()
@@ -24,6 +21,8 @@ async fn main() -> Result<(), Error> {
     // required to enable CloudWatch error logging by the runtime
     tracing::init_default_subscriber();
 
+    let app_state = AppState::new().await;
+
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
         .allow_methods([Method::GET, Method::POST])
@@ -33,7 +32,9 @@ async fn main() -> Result<(), Error> {
     let app = Router::new()
         .route("/", get(root))
         .route("/__health", get(health))
-        .layer(cors);
+        .merge(threads::threads_routes())
+        .layer(cors)
+        .with_state(app_state);
 
     run(app).await
 }

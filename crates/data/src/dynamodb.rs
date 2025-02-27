@@ -1,8 +1,22 @@
 use crate::error::Result;
+use aws_config::Region;
 use aws_sdk_dynamodb::types::AttributeValue;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_dynamo::aws_sdk_dynamodb_1::to_item;
+use std::env;
+
+#[cfg(test)]
+const LOCAL_ENDPOINT_URL: Option<&str> = Some("http://localhost:9001");
+#[cfg(not(test))]
+const LOCAL_ENDPOINT_URL: Option<&str> = None;
+
+fn get_endpoint_url() -> Option<String> {
+    let endpoint_from_env = env::var("DYNAMODB_ENDPOINT_URL").ok();
+    LOCAL_ENDPOINT_URL
+        .or(endpoint_from_env.as_deref())
+        .map(|s| s.to_string())
+}
 
 pub struct Db {
     pub client: aws_sdk_dynamodb::Client,
@@ -10,29 +24,44 @@ pub struct Db {
 }
 
 impl Db {
-    /// Creates a new `Db` by loading AWS config from the environment and reading TABLE_NAME.
-    #[cfg(not(test))]
-    pub async fn new() -> Self {
+    async fn get_config() -> aws_config::SdkConfig {
+        // Run this in dev/test, but not in release builds.
+        #[cfg(any(debug_assertions, test))]
+        if let Some(endpoint_url) = get_endpoint_url() {
+            let config = aws_config::from_env()
+                .endpoint_url(endpoint_url)
+                .region(Region::new("us-east-1"))
+                .test_credentials()
+                .load()
+                .await;
+            return config;
+        }
         let config = aws_config::load_from_env().await;
-        let client = aws_sdk_dynamodb::Client::new(&config);
-        let table_name =
-            std::env::var("TABLE_NAME").expect("TABLE_NAME must be set in the environment");
-        Self { client, table_name }
+        config
     }
 
-    #[cfg(test)]
+    /// Creates a new `Db` by loading AWS config from the environment and reading TABLE_NAME.
     pub async fn new() -> Self {
-        use aws_config::Region;
-
-        let config = aws_config::from_env()
-            .endpoint_url("http://localhost:8000")
-            .region(Region::new("us-east-1"))
-            .test_credentials()
-            .load()
-            .await;
+        let config = Self::get_config().await;
         let client = aws_sdk_dynamodb::Client::new(&config);
-        let table_name = "TenantSettingsTestTable".into();
-        Self { client, table_name }
+        let table_name = env::var("TABLE_NAME").expect("TABLE_NAME must be set in the environment");
+
+        let db = Self { client, table_name };
+
+        // Initialize the database if in dev/test environments and the endpoint override is set. When we're connecting to AWS DynamoDB, we don't want to initialize the database, but we do if we're connecting to a local DynamoDB instance.
+        #[cfg(any(debug_assertions, test))]
+        if let Some(_) = get_endpoint_url() {
+            db.init_schema().await;
+        }
+
+        db
+    }
+
+    /// Initialize the database. Only avaliable in dev/test environments.
+    #[cfg(any(debug_assertions, test))]
+    pub async fn init_schema(&self) {
+        use crate::dynamodb_schema::create_table_if_not_exists;
+        create_table_if_not_exists(self).await;
     }
 
     /// Put an item into DynamoDB.
@@ -121,67 +150,10 @@ impl ChatMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_sdk_dynamodb::types::{
-        AttributeDefinition, KeySchemaElement, KeyType, ProvisionedThroughput, ScalarAttributeType,
-    };
-
-    /// A helper function to create the test table if it does not exist.
-    async fn create_table_if_not_exists(db: &Db) {
-        let table_name = &db.table_name;
-        let table = db
-            .client
-            .create_table()
-            .table_name(table_name)
-            .attribute_definitions(
-                AttributeDefinition::builder()
-                    .attribute_name("pk")
-                    .attribute_type(ScalarAttributeType::S)
-                    .build()
-                    .unwrap(),
-            )
-            .attribute_definitions(
-                AttributeDefinition::builder()
-                    .attribute_name("sk")
-                    .attribute_type(ScalarAttributeType::S)
-                    .build()
-                    .unwrap(),
-            )
-            .key_schema(
-                KeySchemaElement::builder()
-                    .attribute_name("pk")
-                    .key_type(KeyType::Hash)
-                    .build()
-                    .unwrap(),
-            )
-            .key_schema(
-                KeySchemaElement::builder()
-                    .attribute_name("sk")
-                    .key_type(KeyType::Range)
-                    .build()
-                    .unwrap(),
-            )
-            .provisioned_throughput(
-                ProvisionedThroughput::builder()
-                    .read_capacity_units(5)
-                    .write_capacity_units(5)
-                    .build()
-                    .unwrap(),
-            )
-            .send()
-            .await;
-        match table {
-            Ok(_) => println!("Created table: {}", table_name),
-            Err(_) => println!("Table probably exists: {}", table_name),
-        }
-    }
-
     /// A test that creates a table, puts a ChatMessage item, and retrieves it.
     #[tokio::test]
     async fn test_put_and_get_chat_message() {
         let db = Db::new().await;
-
-        // Create the table if needed.
-        create_table_if_not_exists(&db).await;
 
         // Build a ChatMessage item using the builder.
         // Note: The custom setters automatically set the partition and sort keys.
@@ -224,9 +196,6 @@ mod tests {
     #[tokio::test]
     async fn test_get_non_existent_chat_message() {
         let db = Db::new().await;
-
-        // Make sure the table exists (idempotent).
-        create_table_if_not_exists(&db).await;
 
         // Try to get a chat message for a user/thread combination that doesn't exist.
         let retrieved =
