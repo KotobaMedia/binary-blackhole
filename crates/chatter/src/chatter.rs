@@ -43,6 +43,14 @@ impl Chatter {
         })
     }
 
+    /// Create a new context with default parameters. The Chatter's internal context
+    /// will be replaced with the new context.
+    pub async fn new_context(&mut self) -> Result<()> {
+        self.context = ChatterContext::new(&self.pg_client).await?;
+        Ok(())
+    }
+
+    /// Switch the internal context with an already instantiated ChatterContext.
     pub fn switch_context(&mut self, context: ChatterContext) {
         self.context = context;
     }

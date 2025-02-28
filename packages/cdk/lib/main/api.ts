@@ -3,6 +3,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 import { RustFunction } from 'cargo-lambda-cdk';
+import { Duration } from 'aws-cdk-lib';
 
 type APIProps = {
   mainTable: dynamodb.Table;
@@ -22,6 +23,8 @@ export class API extends Construct {
       environment: {
         MAIN_TABLE: mainTable.tableName,
       },
+      memorySize: 256,
+      timeout: Duration.seconds(30),
     });
 
     mainTable.grantReadWriteData(this.apiFn);

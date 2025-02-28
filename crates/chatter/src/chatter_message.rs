@@ -9,18 +9,31 @@ use serde::{Deserialize, Serialize};
 
 pub type Role = OpenAIRole;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum ChatterMessageSidecar {
+    #[default]
     None,
     SQLExecution((String, String)),
+}
+
+impl ChatterMessageSidecar {
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChatterMessage {
     pub message: Option<String>,
     pub role: Role,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub tool_calls: Option<Vec<ChatCompletionMessageToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "ChatterMessageSidecar::is_none")]
+    #[serde(default)]
     pub sidecar: ChatterMessageSidecar,
 }
 

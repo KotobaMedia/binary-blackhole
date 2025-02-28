@@ -6,6 +6,7 @@ use lambda_http::{Error, run, tracing};
 use state::AppState;
 use tower_http::cors::{Any, CorsLayer};
 
+mod error;
 mod state;
 mod threads;
 

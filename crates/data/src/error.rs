@@ -14,4 +14,7 @@ pub enum DataError {
     DynamoGetItemError(#[from] SdkError<operation::get_item::GetItemError>),
     #[error(transparent)]
     DynamoQueryError(#[from] SdkError<operation::query::QueryError>),
+
+    #[error("Document not found")]
+    DocumentNotFound,
 }

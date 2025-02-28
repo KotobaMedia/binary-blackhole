@@ -1,9 +1,11 @@
-use crate::error::Result;
+use crate::error::{DataError, Result};
 use aws_config::Region;
+use aws_sdk_dynamodb::operation::query::builders::QueryFluentBuilder;
 use aws_sdk_dynamodb::types::AttributeValue;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_dynamo::aws_sdk_dynamodb_1::to_item;
+use std::collections::HashMap;
 use std::env;
 
 #[cfg(test)]
@@ -75,6 +77,146 @@ impl Db {
             .await?;
         Ok(())
     }
+
+    /// Exclusively put an item into DynamoDB.
+    /// This will fail if a record with the same key attributes already exist.
+    pub async fn put_item_excl<T: Serialize>(&self, input: T) -> Result<()> {
+        let item = to_item(input)?;
+        self.client
+            .put_item()
+            .table_name(&self.table_name)
+            .condition_expression("attribute_not_exists(pk) AND attribute_not_exists(sk)")
+            .set_item(Some(item))
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    /// Execute a DynamoDB query with pagination, collecting all results.
+    /// Takes a pre-built query builder and handles pagination.
+    pub async fn query_all(
+        &self,
+        query_builder: QueryFluentBuilder,
+        limit: Option<usize>,
+    ) -> Result<Vec<HashMap<String, AttributeValue>>> {
+        let mut items = Vec::new();
+        let mut exclusive_start_key: Option<AttributeValue> = None;
+
+        loop {
+            // Clone the builder for each pagination request
+            let mut query = query_builder.clone().table_name(&self.table_name);
+
+            // Set limit if provided
+            if let Some(limit_val) = limit {
+                query = query.limit(limit_val as i32);
+            }
+
+            // Add exclusive start key for pagination if we have one
+            if let Some(key) = &exclusive_start_key {
+                query = query.exclusive_start_key("sk", key.clone());
+            }
+
+            let result = query.send().await?;
+
+            if let Some(result_items) = result.items {
+                items.extend(result_items);
+            }
+
+            exclusive_start_key = result.last_evaluated_key.and_then(|v| v.get("sk").cloned());
+
+            // If there's no last evaluated key, we're done
+            if exclusive_start_key.is_none() {
+                if let Some(limit_val) = limit.filter(|&v| v < items.len()) {
+                    items.truncate(limit_val);
+                }
+                break;
+            }
+
+            // If we have a limit and we've reached it, we're done
+            if let Some(limit_val) = limit.filter(|&v| v < items.len()) {
+                items.truncate(limit_val);
+                break;
+            }
+        }
+
+        Ok(items)
+    }
+}
+
+#[derive(Serialize, Deserialize, Builder)]
+pub struct ChatThread {
+    /// `User#<user_id>`
+    #[builder(setter(custom))]
+    pub pk: String,
+    /// `ChatThread#<thread_id>`
+    #[builder(setter(custom))]
+    pub sk: String,
+
+    pub title: String,
+}
+impl ChatThreadBuilder {
+    /// Custom setter for `user_id` that sets `pk` automatically.
+    pub fn user_id(&mut self, user_id: String) -> &mut Self {
+        self.pk = Some(format!("User#{}", user_id));
+        self
+    }
+    /// Custom setter for `thread_id` that sets `sk` automatically.
+    pub fn id(&mut self, thread_id: String) -> &mut Self {
+        self.sk = Some(format!("ChatThread#{}", thread_id));
+        self
+    }
+}
+
+impl ChatThread {
+    pub fn user_id(&self) -> &str {
+        self.pk.trim_start_matches("User#")
+    }
+
+    pub fn id(&self) -> &str {
+        self.sk.trim_start_matches("ChatThread#")
+    }
+
+    pub async fn get_thread(db: &Db, user_id: &str, thread_id: &str) -> Result<Self> {
+        let item = db
+            .client
+            .get_item()
+            .table_name(&db.table_name)
+            .key("pk", AttributeValue::S(format!("User#{}", user_id)))
+            .key("sk", AttributeValue::S(format!("ChatThread#{}", thread_id)))
+            .send()
+            .await?
+            .item;
+
+        if let Some(item) = item {
+            let thread = serde_dynamo::from_item(item)?;
+            Ok(thread)
+        } else {
+            Err(DataError::DocumentNotFound)
+        }
+    }
+
+    pub async fn get_all_user_threads(db: &Db, user_id: &str) -> Result<Vec<Self>> {
+        // Build the query
+        let query_builder = db
+            .client
+            .query()
+            .key_condition_expression("#pk = :pk AND begins_with(#sk, :sk)")
+            .expression_attribute_names("#pk", "pk")
+            .expression_attribute_names("#sk", "sk")
+            .expression_attribute_values(":pk", AttributeValue::S(format!("User#{}", user_id)))
+            .expression_attribute_values(":sk", AttributeValue::S("ChatThread#".to_string()));
+
+        // Use the query_all method with our prepared query builder
+        let items = db.query_all(query_builder, None).await?;
+
+        // Convert DynamoDB items to ChatThread structs
+        let threads = items
+            .into_iter()
+            .map(|item| serde_dynamo::from_item(item))
+            .collect::<std::result::Result<Vec<Self>, _>>()?;
+
+        Ok(threads)
+    }
 }
 
 #[derive(Serialize, Deserialize, Builder)]
@@ -98,7 +240,9 @@ impl ChatMessageBuilder {
 
     /// Custom setter for `thread_id` and `message_id` that sets `sk` automatically.
     pub fn thread_message_ids(&mut self, thread_id: String, message_id: u32) -> &mut Self {
-        self.sk = Some(format!("ChatMessage#{}#{}", thread_id, message_id));
+        // pad the message_id with zeros so DynamoDB sorts it correctly
+        // we shouldn't need more than 3 digits (a 999 message thread is already way too long)
+        self.sk = Some(format!("ChatMessage#{}#{:03}", thread_id, message_id));
         self
     }
 }
@@ -112,7 +256,7 @@ impl ChatMessage {
         self.sk.split('#').nth(1).unwrap()
     }
 
-    pub fn message_id(&self) -> u32 {
+    pub fn id(&self) -> u32 {
         self.sk.split('#').nth(2).unwrap().parse().unwrap()
     }
 
@@ -121,11 +265,11 @@ impl ChatMessage {
         db: &Db,
         user_id: &str,
         thread_id: &str,
-    ) -> Result<Option<Self>> {
-        let query = db
+    ) -> Result<Vec<Self>> {
+        // Build the query
+        let query_builder = db
             .client
             .query()
-            .table_name(&db.table_name)
             .key_condition_expression("#pk = :pk AND begins_with(#sk, :sk)")
             .expression_attribute_names("#pk", "pk")
             .expression_attribute_names("#sk", "sk")
@@ -133,17 +277,18 @@ impl ChatMessage {
             .expression_attribute_values(
                 ":sk",
                 AttributeValue::S(format!("ChatMessage#{}#", thread_id)),
-            )
-            .send()
-            .await?;
-        let items = query.items.unwrap_or_default();
-        let item = items.into_iter().next();
-        let item = match item {
-            Some(item) => item,
-            None => return Ok(None),
-        };
-        let parsed_item = serde_dynamo::from_item(item)?;
-        Ok(Some(parsed_item))
+            );
+
+        // Use the query_all method with our prepared query builder
+        let items = db.query_all(query_builder, None).await?;
+
+        // Convert DynamoDB items to ChatMessage structs
+        let messages = items
+            .into_iter()
+            .map(|item| serde_dynamo::from_item(item))
+            .collect::<std::result::Result<Vec<Self>, _>>()?;
+
+        Ok(messages)
     }
 }
 
@@ -180,32 +325,32 @@ mod tests {
             .await
             .expect("Get call failed");
 
-        // Verify that we found a record and that its contents are correct.
+        // Verify that we found records and that contents are correct.
         assert!(
-            retrieved.is_some(),
-            "Expected to find a chat message record"
+            !retrieved.is_empty(),
+            "Expected to find at least one chat message"
         );
-        let retrieved = retrieved.unwrap();
-        assert_eq!(retrieved.user_id(), "user123");
-        assert_eq!(retrieved.thread_id(), "thread456");
-        assert_eq!(retrieved.message_id(), 1);
-        assert_eq!(retrieved.msg.message.unwrap(), "Hello, world!");
+        let first_message = &retrieved[0];
+        assert_eq!(first_message.user_id(), "user123");
+        assert_eq!(first_message.thread_id(), "thread456");
+        assert_eq!(first_message.id(), 1);
+        assert_eq!(first_message.msg.message.as_ref().unwrap(), "Hello, world!");
     }
 
-    /// A test to ensure that getting a non-existent chat message returns `None`.
+    /// A test to ensure that getting non-existent chat messages returns an empty vector.
     #[tokio::test]
     async fn test_get_non_existent_chat_message() {
         let db = Db::new().await;
 
-        // Try to get a chat message for a user/thread combination that doesn't exist.
+        // Try to get chat messages for a user/thread combination that doesn't exist.
         let retrieved =
             ChatMessage::get_all_thread_messages(&db, "nonexistent_user", "nonexistent_thread")
                 .await
                 .expect("Get call failed");
 
         assert!(
-            retrieved.is_none(),
-            "Expected `None` for a missing chat message record"
+            retrieved.is_empty(),
+            "Expected empty vector for a missing chat message record"
         );
     }
 }
