@@ -41,6 +41,6 @@ result
   .then(() => {
     console.log('All processes have exited successfully.');
   })
-  .catch((error) => {
-    console.error('An error occurred while running the processes:', error);
+  .catch(() => {
+    console.error('An error occurred while running the processes');
   });
