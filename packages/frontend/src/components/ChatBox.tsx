@@ -1,4 +1,4 @@
-import React, { JSX, useCallback, useState } from "react";
+import React, { JSX, useCallback, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import logo from "/logo-small.svg?url";
 import { QuestionCircleFill } from "react-bootstrap-icons";
@@ -127,11 +127,19 @@ const ChatBox: React.FC = () => {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
+  const messageContainerRef = useRef<HTMLDivElement>(null);
 
   const { data, error, isLoading, mutate } = useSWR<ThreadDetails>(
     threadId ? `${apiUrl}/threads/${threadId}` : null,
     fetcher
   );
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messageContainerRef.current && data?.messages.length) {
+      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+    }
+  }, [data?.messages]);
 
   const handleSendMessage = async (message: string) => {
     setIsSending(true);
@@ -215,7 +223,10 @@ const ChatBox: React.FC = () => {
         </div>
       </nav>
 
-      <div className="d-flex flex-column flex-grow-1 text-body">
+      <div
+        ref={messageContainerRef}
+        className="d-flex flex-column flex-grow-1 text-body overflow-y-auto"
+      >
         {(isLoading && threadId) && (
           <div className="text-center p-3">
             <div className="spinner-border text-primary" role="status">
