@@ -32,6 +32,27 @@ type CreateThreadResponse = {
   thread_id: string;
 };
 
+// Helper functions for optimistic updates
+const createOptimisticUserMessage = (message: string, lastId: number): Message => {
+  return {
+    id: lastId + 1,
+    content: {
+      message,
+      role: "user"
+    }
+  };
+};
+
+const createOptimisticAssistantTypingMessage = (lastId: number): Message => {
+  return {
+    id: lastId + 2,
+    content: {
+      message: "...",
+      role: "assistant"
+    }
+  };
+};
+
 // SWR fetcher function
 const fetcher = (url: string) => fetch(url).then(res => {
   if (!res.ok) {
@@ -147,6 +168,16 @@ const ChatBox: React.FC = () => {
     try {
       if (!threadId) {
         // Create a new thread with the first message
+        // Optimistically show the user message
+        const optimisticData: ThreadDetails = {
+          id: 'temp-thread',
+          title: 'New Conversation',
+          messages: [createOptimisticUserMessage(message, 0)]
+        };
+
+        // Optimistically update the UI
+        mutate(optimisticData, false);
+
         const response = await fetch(`${apiUrl}/threads`, {
           method: 'POST',
           headers: {
@@ -159,7 +190,26 @@ const ChatBox: React.FC = () => {
 
         const data: CreateThreadResponse = await response.json();
         setThreadId(data.thread_id);
+
+        // Now fetch the real thread data
+        mutate();
       } else {
+        // Get the last message ID to generate unique IDs for optimistic updates
+        const lastId = data?.messages.length ? data.messages[data.messages.length - 1].id : 0;
+
+        // Create optimistic data by adding the new message to existing messages
+        const optimisticData: ThreadDetails = {
+          ...(data as ThreadDetails),
+          messages: [
+            ...(data?.messages || []),
+            createOptimisticUserMessage(message, lastId),
+            createOptimisticAssistantTypingMessage(lastId)
+          ]
+        };
+
+        // Update the UI optimistically
+        mutate(optimisticData, false);
+
         // Send message to existing thread
         const response = await fetch(`${apiUrl}/threads/${threadId}/message`, {
           method: 'POST',
@@ -171,11 +221,13 @@ const ChatBox: React.FC = () => {
 
         if (!response.ok) throw new Error('Failed to send message');
 
-        // Refresh the thread data to show the new messages
+        // Refresh the thread data to show the actual response
         await mutate();
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      // If there was an error, revalidate to restore the correct state
+      mutate();
     } finally {
       setIsSending(false);
     }
