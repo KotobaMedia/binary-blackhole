@@ -4,6 +4,8 @@ import logo from "/logo-small.svg?url";
 import { QuestionCircleFill } from "react-bootstrap-icons";
 import useSWR from "swr";
 import { useLocation, useRoute } from "wouter";
+import { layersAtom, SQLLayer } from "./atoms";
+import { useSetAtom } from "jotai";
 
 
 
@@ -161,6 +163,7 @@ const useSetThreadId = () => {
 const ChatBox: React.FC = () => {
   const threadId = useThreadId();
   const setThreadId = useSetThreadId();
+  const setLayers = useSetAtom(layersAtom);
   const [isSending, setIsSending] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
   const messageContainerRef = useRef<HTMLDivElement>(null);
@@ -249,6 +252,24 @@ const ChatBox: React.FC = () => {
   };
 
   let messages: JSX.Element[] = [];
+
+  // Set layers from data
+  useEffect(() => {
+    const messages = data?.messages;
+    if (!messages) return;
+    const layers: SQLLayer[] = [];
+    for (const message of messages) {
+      const { content } = message;
+      if (content.role === "tool" && content.sidecar && content.sidecar !== "None") {
+        const execution = content.sidecar.SQLExecution;
+        layers.push({
+          name: execution[0],
+          sql: execution[1],
+        });
+      }
+    }
+    setLayers(layers);
+  }, [data?.messages, setLayers]);
 
   // Map the messages from the API response to UI components
   if (data) {
