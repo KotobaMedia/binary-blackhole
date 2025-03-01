@@ -1,0 +1,9 @@
+export OPENAI_API_KEY="..."
+export POSTGRES_CONN_STR="host=localhost dbname=bbh"
+
+export AWS_PROFILE="..."
+export CDK_DEV_ACCOUNT_ID="..."
+
+# For local DynamoDB support
+export DYNAMODB_ENDPOINT_URL="http://localhost:9001"
+export TABLE_NAME="bbh-local"

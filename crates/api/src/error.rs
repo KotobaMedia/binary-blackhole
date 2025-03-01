@@ -9,7 +9,7 @@ pub type Result<T> = std::result::Result<T, AppError>;
 pub struct AppError(anyhow::Error);
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        tracing::error!("Unhandled error: {}", self.0);
+        tracing::error!("Unhandled error: {:?}", self.0);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Something went wrong. Please try again later."),

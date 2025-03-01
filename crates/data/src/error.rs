@@ -5,14 +5,14 @@ pub type Result<T> = std::result::Result<T, DataError>;
 
 #[derive(Error, Debug)]
 pub enum DataError {
-    #[error(transparent)]
+    #[error("serde_dynamo Error: {0}")]
     SerdeDynamoError(#[from] serde_dynamo::Error),
 
-    #[error(transparent)]
+    #[error("DynamoDB PutItem Error: {0}")]
     DynamoPutItemError(#[from] SdkError<operation::put_item::PutItemError>),
-    #[error(transparent)]
+    #[error("DynamoDB GetItem Error: {0}")]
     DynamoGetItemError(#[from] SdkError<operation::get_item::GetItemError>),
-    #[error(transparent)]
+    #[error("DynamoDB Query Error: {0}")]
     DynamoQueryError(#[from] SdkError<operation::query::QueryError>),
 
     #[error("Document not found")]

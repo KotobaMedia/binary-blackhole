@@ -17,6 +17,7 @@
     "react-bootstrap-icons": "^1.11.5",
     "react-dom": "^19.0.0",
     "react-map-gl": "^8.0.1",
+    "react-markdown": "^10.0.0",
     "swr": "^2.3.2"
   },
   "devDependencies": {

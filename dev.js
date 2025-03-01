@@ -31,7 +31,12 @@ function getDynamoDBCommand() {
 
 const { result } = concurrently([
   { command: 'cd packages/frontend && pnpm dev', name: 'frontend', prefixColor: 'blue' },
-  { command: 'cargo lambda watch --bin api', name: 'backend', prefixColor: 'green' },
+  {
+    command: 'cargo lambda watch --bin api',
+    name: 'backend',
+    prefixColor: 'green',
+    env: { RUST_BACKTRACE: '1' }
+  },
   { command: getDynamoDBCommand(), name: 'dynamodb', prefixColor: 'yellow' }
 ], {
   killOthers: ['failure', 'success'],

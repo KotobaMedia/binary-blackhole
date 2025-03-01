@@ -101,8 +101,11 @@ async fn get_thread_handler(
         title: thread.title,
         messages: messages
             .into_iter()
-            .filter(|m| m.msg.role != chatter::chatter_message::Role::System)
             .map(Into::into)
+            .filter(|m: &Message| {
+                m.content.role != chatter::chatter_message::Role::System
+                    && (!m.content.sidecar.is_none() || !m.content.message.is_none())
+            })
             .collect(),
     }
     .into())

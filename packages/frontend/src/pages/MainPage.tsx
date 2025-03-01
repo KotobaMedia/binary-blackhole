@@ -4,7 +4,7 @@ import MainMap from "../components/MainMap";
 
 const MainPage: React.FC = () => {
   return (
-    <div className="row h-100 bg-dark text-light">
+    <div className="row bg-primary-subtle h-100">
       <ChatBox />
       <MainMap />
     </div>
