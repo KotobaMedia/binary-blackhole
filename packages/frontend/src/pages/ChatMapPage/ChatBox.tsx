@@ -3,6 +3,9 @@ import ReactMarkdown from "react-markdown";
 import logo from "/logo-small.svg?url";
 import { QuestionCircleFill } from "react-bootstrap-icons";
 import useSWR from "swr";
+import { useLocation, useRoute } from "wouter";
+
+
 
 // Types for the API response data
 type Role = "user" | "assistant" | "system" | "tool";
@@ -144,8 +147,20 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({ onSendMessage, isLoadin
   );
 }
 
+const useThreadId = () => {
+  const [match, params] = useRoute('/chats/:threadId');
+  return match ? params.threadId : null;
+}
+const useSetThreadId = () => {
+  const [_, navigate] = useLocation();
+  return useCallback((id: string) => {
+    navigate(`/chats/${id}`);
+  }, [navigate]);
+};
+
 const ChatBox: React.FC = () => {
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const threadId = useThreadId();
+  const setThreadId = useSetThreadId();
   const [isSending, setIsSending] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
   const messageContainerRef = useRef<HTMLDivElement>(null);
@@ -266,7 +281,7 @@ const ChatBox: React.FC = () => {
 
   return (
     <div className="col-4 d-flex flex-column h-100 overflow-y-auto overflow-x-hidden">
-      <nav className="navbar navbar-expand-lg position-sticky top-0 bg-primary-subtle bg-opacity-75">
+      <nav className="navbar navbar-expand-lg position-sticky top-0 bg-body bg-opacity-75">
         <div className="container-fluid">
           <a className="navbar-brand" href="#">
             <img src={logo} alt="logo" width="30" height="30" className="d-inline-block align-middle" />
@@ -277,7 +292,7 @@ const ChatBox: React.FC = () => {
 
       <div
         ref={messageContainerRef}
-        className="d-flex flex-column flex-grow-1 text-body overflow-y-auto"
+        className="d-flex flex-column flex-grow-1"
       >
         {(isLoading && threadId) && (
           <div className="text-center p-3">
@@ -295,7 +310,7 @@ const ChatBox: React.FC = () => {
 
         {messages}
 
-        <div className="position-sticky bottom-0 mt-auto py-3 bg-primary-subtle bg-opacity-75">
+        <div className="position-sticky bottom-0 mt-auto py-3 bg-body bg-opacity-75">
           <SendMessageBox onSendMessage={handleSendMessage} isLoading={isSending} />
         </div>
       </div>
