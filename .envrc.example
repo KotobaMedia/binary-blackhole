@@ -9,4 +9,4 @@ export DYNAMODB_ENDPOINT_URL="http://localhost:9001"
 export TABLE_NAME="bbh-local"
 
 # For deployment
-export POSTGRES_CONN_STR_Dev="host=... dbname=... user=... password=..."
+export RDS_PASSWORD_Dev="..."
