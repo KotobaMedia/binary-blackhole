@@ -1,4 +1,5 @@
 import { atom } from "jotai";
+import type { MapGeoJSONFeature } from 'react-map-gl/maplibre';
 
 export type SQLLayer = {
   name: string;
@@ -6,4 +7,11 @@ export type SQLLayer = {
   enabled: boolean;
 }
 
+export type SelectedFeatureInfo = {
+  feature: MapGeoJSONFeature;
+  layerName: string;
+  geometryType: string;
+}
+
 export const layersAtom = atom<SQLLayer[]>([]);
+export const selectedFeaturesAtom = atom<SelectedFeatureInfo[]>([]);

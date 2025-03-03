@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Maplibre, { Source, Layer, MapRef } from 'react-map-gl/maplibre';
-import { layersAtom, SQLLayer } from "./atoms";
-import { useAtomValue } from "jotai";
+import Maplibre, { Source, Layer, MapRef, MapLayerMouseEvent } from 'react-map-gl/maplibre';
+import { layersAtom, SQLLayer, selectedFeaturesAtom, SelectedFeatureInfo } from "./atoms";
+import { useAtomValue, useSetAtom } from "jotai";
 import useSWR from 'swr';
 import chroma from 'chroma-js';
 
@@ -144,6 +144,7 @@ const MainMap: React.FC = () => {
   const layers = useAtomValue(layersAtom).filter(layer => layer.enabled);
   const [layerBboxes, setLayerBboxes] = useState<Record<string, BBox | undefined>>({});
   const mapRef = useRef<MapRef>(null);
+  const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
 
   // Handle bbox updates from individual layers
   const handleBboxChange = useCallback((layerName: string, bbox: BBox | undefined) => {
@@ -152,6 +153,55 @@ const MainMap: React.FC = () => {
       [layerName]: bbox
     }));
   }, []);
+
+  // Handle click on map features
+  const handleMapClick = useCallback((event: MapLayerMouseEvent) => {
+    if (!mapRef.current) return;
+
+    const map = mapRef.current.getMap();
+    // Get all visible layers that we've added
+    const visibleLayers = layers.map(layer => [
+      `${layer.name}/point`,
+      `${layer.name}/line`,
+      `${layer.name}/polygon-fill`,
+      `${layer.name}/polygon-outline`
+    ]).flat();
+
+    // Query features at the clicked point
+    const features = map.queryRenderedFeatures(event.point, {
+      layers: visibleLayers
+    });
+
+    if (features.length > 0) {
+      console.log('Clicked features:', features);
+
+      // Format feature information and store in the atom
+      const formattedFeatures: SelectedFeatureInfo[] = features.map(feature => {
+        const layerId = feature.layer.id;
+        const layerName = layerId.split('/')[0];
+        const geometryType = layerId.split('/')[1];
+
+        // Log for debugging
+        console.log(`Feature from layer: ${layerName} (${geometryType})`);
+        console.log('Properties:', feature.properties);
+        console.log('Geometry type:', feature.geometry.type);
+        console.log('-------------------');
+
+        return {
+          feature,
+          layerName,
+          geometryType
+        };
+      });
+
+      // Update the atom with selected features
+      setSelectedFeatures(formattedFeatures);
+    } else {
+      console.log('No features found at this location');
+      // Clear selected features when clicking on empty space
+      setSelectedFeatures([]);
+    }
+  }, [layers, setSelectedFeatures]);
 
   // Calculate merged bbox and fit map when bboxes change
   useEffect(() => {
@@ -180,6 +230,7 @@ const MainMap: React.FC = () => {
         latitude: 37,
         zoom: 4.0,
       }}
+      onClick={handleMapClick}
     >
       {layers.map(layer => (
         <MapLayer

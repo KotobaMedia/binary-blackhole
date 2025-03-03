@@ -1,2 +1,6 @@
 @import "bootstrap/scss/bootstrap";
 @import "maplibre-gl/dist/maplibre-gl.css";
+
+.maplibregl-canvas-container.maplibregl-interactive {
+    cursor: crosshair;
+}
