@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 
-package.license = "MIT"
+package.license = "AGPL-3.0-only"
 package.authors = [
   "Keitaroh Kobayashi <keita@kotobamedia.com>"
 ]
