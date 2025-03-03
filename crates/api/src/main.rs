@@ -7,6 +7,7 @@ use state::AppState;
 use tower_http::cors::{Any, CorsLayer};
 
 mod error;
+mod query;
 mod state;
 mod threads;
 
@@ -34,6 +35,7 @@ async fn main() -> Result<(), Error> {
         .route("/", get(root))
         .route("/__health", get(health))
         .merge(threads::threads_routes())
+        .merge(query::query_routes())
         .layer(cors)
         .with_state(app_state);
 

@@ -4,12 +4,19 @@ use crate::{
     chatter_context::ChatterContext,
     error::Result,
     functions::{ExecutionContext, ExecutionContextBuilder},
+    geom::GeometryWrapper,
 };
 use async_openai::types::{
     ChatCompletionMessageToolCall, ChatCompletionRequestMessage, ChatCompletionResponseMessage,
     CreateChatCompletionRequestArgs,
 };
+use geo_types::Geometry;
 use tokio_postgres::NoTls;
+
+pub struct QueryResultRow {
+    pub geom: Geometry,
+    pub properties: serde_json::Value,
+}
 
 pub struct Chatter {
     pub context: ChatterContext,
@@ -105,6 +112,73 @@ impl Chatter {
             }
         };
         self.context.add_message(response);
+        Ok(())
+    }
+
+    /// Execute a SQL query and return the result. Used by the API to execute queries.
+    /// TODO: This area requires a lot of refactoring -- the query_database tool
+    /// should actually run the query, store the result somewhere, then return the ID of
+    /// the execution, rendering this function obsolete. This is used in the meantime.
+    pub async fn execute_query(&mut self, query: &str) -> Result<Vec<QueryResultRow>> {
+        // we wrap the query so we get the geometry and attributes in the correct formats
+        let internal_query = format!(
+            r#"
+            SELECT
+                "bbh_internal_query"."geom",
+                to_jsonb("bbh_internal_query") - 'geom' AS "properties"
+            FROM (
+                {}
+            ) AS "bbh_internal_query"
+        "#,
+            query
+        );
+        let rows = self
+            .pg_client
+            .query(&internal_query, &[])
+            .await?
+            .iter()
+            .map(|row| {
+                let geom: Geometry = row.get::<_, GeometryWrapper>("geom").0;
+                let properties: serde_json::Value = row.get("properties");
+                QueryResultRow { geom, properties }
+            })
+            .collect();
+        Ok(rows)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use geo_types::Point;
+    use serde_json::Value;
+
+    #[tokio::test]
+    async fn test_chatter() -> Result<()> {
+        Chatter::new().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_query() -> Result<()> {
+        let mut chatter = Chatter::new().await?;
+        // some data we just create for the test
+        let rows = chatter
+            .execute_query(
+                r#"
+            SELECT
+                'hello' as "name",
+                ST_Point(35, 135, 4326) as "geom"
+        "#,
+            )
+            .await?;
+        assert!(!rows.is_empty());
+        let row = &rows[0];
+        assert_eq!(
+            row.properties.get("name"),
+            Some(&Value::String("hello".to_string()))
+        );
+        assert_eq!(row.geom, Point::new(35.0, 135.0).into());
         Ok(())
     }
 }

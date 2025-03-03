@@ -57,9 +57,7 @@ impl ExecutionContext {
         let parameters_schema = json!(schema_for!(DescribeTablesParams));
         FunctionObject {
             name: "describe_tables".into(),
-            description: Some(
-                "Query the database to get detailed information about the requested tables.".into(),
-            ),
+            description: Some("Get detailed information about the requested tables.".into()),
             parameters: Some(parameters_schema),
             strict: Some(true),
         }
@@ -135,7 +133,7 @@ impl ExecutionContext {
         let parameters_schema = json!(schema_for!(QueryDatabaseParams));
         FunctionObject {
             name: "query_database".into(),
-            description: Some("Query the database with the provided SQL query.".into()),
+            description: Some("Query the database and show results to the user.".into()),
             parameters: Some(parameters_schema),
             strict: Some(true),
         }
@@ -153,15 +151,17 @@ impl ExecutionContext {
         tool_call_id: &str,
         params: QueryDatabaseParams,
     ) -> Result<ChatterMessage> {
+        // simple filter: remove the trailing semicolon
+        let query = params.query.trim_end_matches(';');
         let message = format!("Database was queried successfully, and results shown to user.");
-        println!("SQL [{}]: {}", params.name, params.query);
+        println!("SQL [{}]: {}", params.name, &query);
 
         Ok(ChatterMessage {
             message: Some(message),
             role: Role::Tool,
             tool_calls: None,
             tool_call_id: Some(tool_call_id.into()),
-            sidecar: ChatterMessageSidecar::SQLExecution((params.name, params.query)),
+            sidecar: ChatterMessageSidecar::SQLExecution((params.name, query.to_string())),
         })
     }
 }

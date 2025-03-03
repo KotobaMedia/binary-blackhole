@@ -258,6 +258,9 @@ const ChatBox: React.FC = () => {
     const messages = data?.messages;
     if (!messages) return;
     const layers: SQLLayer[] = [];
+    // TODO: this currently overwrites the layers every time
+    // we get new data. We should probably merge them instead.
+    // also, save the enabled state between refreshes
     for (const message of messages) {
       const { content } = message;
       if (content.role === "tool" && content.sidecar && content.sidecar !== "None") {
@@ -265,6 +268,7 @@ const ChatBox: React.FC = () => {
         layers.push({
           name: execution[0],
           sql: execution[1],
+          enabled: true,
         });
       }
     }

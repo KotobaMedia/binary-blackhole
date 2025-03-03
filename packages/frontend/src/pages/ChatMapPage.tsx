@@ -9,6 +9,11 @@ const ChatMapPage: React.FC = () => {
       <ChatBox />
       <div className="col-8 p-0">
         <div className="d-flex flex-column h-100">
+          <div className="d-flex flex-wrap px-2 bg-danger align-items-center justify-content-center">
+            <span>
+              EXPERIMENTAL - 実験用
+            </span>
+          </div>
           <MainMap />
           <LayerSelector />
         </div>
