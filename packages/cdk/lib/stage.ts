@@ -4,14 +4,12 @@ import { Stage } from 'aws-cdk-lib';
 import { MainStack } from './main-stack';
 
 export function getStageName(scope: Construct): string {
-  const stackName = scope.node.path.split('/')[1];
-  return stackName.split('-').pop() || 'dev';
-}
-
-export function getVpcId(scope: Construct): string | undefined {
-  const stage = getStageName(scope);
-  const vpcIdEnvVar = `VPC_ID_${stage.toUpperCase()}`;
-  return process.env[vpcIdEnvVar];
+  const stage = Stage.of(scope);
+  const stageName = stage?.stageName;
+  if (!stageName) {
+    throw new Error(`Couldn't find stage name.`);
+  }
+  return stageName;
 }
 
 export class BBHStage extends Stage {

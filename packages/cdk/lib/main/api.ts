@@ -28,6 +28,7 @@ export class API extends Construct {
       allowAllIpv6Outbound: true,
     });
 
+    // TODO: Update to use IAM-based authentication?
     const clusterReadEndpoint = rds.clusterEndpoint.hostname;
     const clusterReadPort = rds.clusterEndpoint.port.toString();
     const rdsPassword = process.env[`RDS_PASSWORD_${getStageName(this)}`];
