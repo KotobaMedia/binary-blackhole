@@ -29,8 +29,8 @@ export class API extends Construct {
     });
 
     // TODO: Update to use IAM-based authentication?
-    const clusterReadEndpoint = rds.clusterEndpoint.hostname;
-    const clusterReadPort = rds.clusterEndpoint.port.toString();
+    const clusterReadEndpoint = rds.clusterReadEndpoint.hostname;
+    const clusterReadPort = rds.clusterReadEndpoint.port.toString();
     const rdsPassword = process.env[`RDS_PASSWORD_${getStageName(this)}`];
     const connStr = `host=${clusterReadEndpoint} port=${clusterReadPort} user=bbh_ro dbname=bbh password=${rdsPassword}`;
 
@@ -41,6 +41,7 @@ export class API extends Construct {
       environment: {
         MAIN_TABLE: mainTable.tableName,
         POSTGRES_CONN_STR: connStr,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
       },
       memorySize: 512,
       timeout: Duration.seconds(30),
