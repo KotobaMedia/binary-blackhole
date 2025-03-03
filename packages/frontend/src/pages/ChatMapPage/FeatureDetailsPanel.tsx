@@ -3,7 +3,7 @@ import { useAtomValue } from "jotai";
 import { SelectedFeatureInfo, selectedFeaturesAtom } from "./atoms";
 
 // Feature Item component for individual feature display
-const FeatureItem: React.FC<{ item: SelectedFeatureInfo; index: number }> = ({ item, index }) => (
+const FeatureItem: React.FC<{ item: SelectedFeatureInfo; index: number }> = ({ item }) => (
   <div className="mb-2">
     <small className="text-muted d-block mb-1">{item.geometryType}</small>
     <div className="properties">
