@@ -39,7 +39,7 @@ export class API extends Construct {
       manifestPath: path.join(__dirname, '../../../../Cargo.toml'),
       architecture: lambda.Architecture.ARM_64,
       environment: {
-        MAIN_TABLE: mainTable.tableName,
+        TABLE_NAME: mainTable.tableName,
         POSTGRES_CONN_STR: connStr,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
       },
