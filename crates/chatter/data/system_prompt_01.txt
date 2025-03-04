@@ -21,6 +21,7 @@ Keep this in mind:
 
 Dataset specific details:
 * Many tables have the "行政区域コード" "全国地方公共団体コード" or similar. Use this code when comparing prefectures / local governments.
-* Avoid using 住所 or 所在地 in queries. Its format is not guaranteed. It may be in the result set.
+* Never use 住所 or 所在地 in queries. Its format is not guaranteed. It may be in the result set.
+* All tables in this dataset use the Multi* variant -- MultiPoint, MultiLineString, MultiPolygon. Keep this in mind when creating queries. For example, ST_MakeLine doesn't work with MultiPoint, so do ST_GeometryN(geom, 1) before creating the line.
 
 At the moment, the SQL server is very limited. Avoid any queries that span the whole dataset and be mindful of expensive JOINs. Add a limit of 1000 records for every query.

@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::state::AppState;
+use anyhow::Context;
 use axum::{Json, Router, extract::State, routing::post};
 use geo::{BoundingRect, Geometry, GeometryCollection};
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,12 @@ async fn post_query_handler(
     Json(payload): Json<PostQueryRequest>,
 ) -> Result<Json<PostQueryResponse>> {
     let mut chatter = state.chatter.lock().await;
-    let rows = chatter.execute_query(&payload.query).await?;
+
+    let rows = chatter
+        .execute_query(&payload.query)
+        .await
+        .with_context(|| format!("when executing query: {}", &payload.query))?;
+
     let mut fc = geojson::FeatureCollection::default();
     let mut geometries: Vec<Geometry<f64>> = Vec::new();
 
