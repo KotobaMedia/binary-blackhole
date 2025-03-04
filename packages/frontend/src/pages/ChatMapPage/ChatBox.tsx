@@ -311,7 +311,7 @@ const ChatBox: React.FC = () => {
       } else if (content.role === "tool" && content.sidecar && content.sidecar !== "None") {
         let sqlText = content.sidecar.SQLExecution[1];
         try {
-          formatSQL(content.sidecar.SQLExecution[1], {
+          sqlText = formatSQL(content.sidecar.SQLExecution[1], {
             language: 'postgresql',
             tabWidth: 2,
             keywordCase: 'upper',
