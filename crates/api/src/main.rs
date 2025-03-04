@@ -44,6 +44,7 @@ async fn main() -> Result<(), Error> {
     let app_state = AppState::new().await;
 
     let cors = CorsLayer::new()
+        .allow_headers([axum::http::header::CONTENT_TYPE])
         // allow `GET` and `POST` when accessing the resource
         .allow_methods([Method::GET, Method::POST])
         // allow requests from any origin
