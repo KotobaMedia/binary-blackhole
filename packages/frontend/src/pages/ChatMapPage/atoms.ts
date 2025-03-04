@@ -5,6 +5,7 @@ export type SQLLayer = {
   name: string;
   sql: string;
   enabled: boolean;
+  error?: string;
 }
 
 export type SelectedFeatureInfo = {

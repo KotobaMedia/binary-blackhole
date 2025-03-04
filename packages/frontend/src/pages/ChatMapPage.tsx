@@ -10,10 +10,10 @@ const ChatMapPage: React.FC = () => {
       <ChatBox />
       <div className="col-5 p-0">
         <div className="d-flex flex-column h-100">
-          <div className="d-flex flex-wrap px-2 bg-danger align-items-center justify-content-center">
+          <div className="d-flex flex-wrap px-2 py-1 bg-danger text-center align-items-center justify-content-center">
             <span>
               <strong>
-                EXPERIMENTAL - 実験用 - <a href="https://github.com/KotobaMedia/binary-blackhole" target="_blank" rel="noopener noreferrer">GitHub で連絡</a>
+                EXPERIMENTAL ・ 実験中 ・ すべてのクエリはログされています ・ <a href="https://github.com/KotobaMedia/binary-blackhole" target="_blank" rel="noopener noreferrer">GitHub はこちら</a> ・ 実験用データは一部<a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noopener noreferrer">国土数値情報</a>を使用しています
               </strong>
             </span>
           </div>

@@ -65,6 +65,7 @@ impl Chatter {
     pub async fn execute(&mut self) -> Result<ChatCompletionResponseMessage> {
         let request = CreateChatCompletionRequestArgs::default()
             .max_completion_tokens(2048u32)
+            .temperature(0.2)
             .model(&self.context.model)
             .messages(
                 self.context

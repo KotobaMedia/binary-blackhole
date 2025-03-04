@@ -47,8 +47,8 @@ const getLayerColor = (layerName: string) => {
 };
 
 // Function to merge multiple bounding boxes
-const mergeBboxes = (bboxes: BBox[]): BBox | null => {
-  if (bboxes.length === 0) return null;
+const mergeBboxes = (bboxes: BBox[]): BBox | undefined => {
+  if (bboxes.length === 0) return undefined;
 
   return bboxes.reduce((merged, current) => {
     if (!merged) return current;
@@ -58,7 +58,7 @@ const mergeBboxes = (bboxes: BBox[]): BBox | null => {
       Math.max(merged[2], current[2]), // max east
       Math.max(merged[3], current[3]), // max north
     ] as BBox;
-  }, null as BBox | null);
+  }, undefined as BBox | undefined);
 };
 
 const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BBox | undefined) => void}> = ({layer, onBboxChange}) => {
@@ -67,11 +67,28 @@ const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BB
     queryFetcher,
     { revalidateOnFocus: false }
   );
+  const setLayers = useSetAtom(layersAtom);
 
   useEffect(() => {
     // Update the parent component with this layer's bbox when it changes
     onBboxChange(layer.name, resp?.bbox);
   }, [resp?.bbox, layer.name, onBboxChange]);
+
+  useEffect(() => {
+    if (error) {
+      setLayers(prev =>
+        prev.map(l => (l.name === layer.name ? { ...l, error: error.message } : l))
+      );
+    }
+    if (resp?.data) {
+      let count = resp?.data.features.length;
+      if (count === 0) {
+        setLayers(prev =>
+          prev.map(l => (l.name === layer.name ? { ...l, error: "No features found" } : l))
+        );
+      }
+    }
+  }, [resp?.data, error, layer.name, setLayers]);
 
   if (error) {
     console.error(`Error loading layer ${layer.name}:`, error);
@@ -206,7 +223,7 @@ const MainMap: React.FC = () => {
   // Calculate merged bbox and fit map when bboxes change
   useEffect(() => {
     const bboxes = Object.values(layerBboxes).filter(
-      (bbox): bbox is BBox => bbox !== undefined
+      (bbox): bbox is BBox => !!bbox
     );
 
     if (bboxes.length > 0 && mapRef.current) {

@@ -1,6 +1,7 @@
 import { useAtom } from "jotai";
 import React, { useCallback } from "react";
 import { layersAtom } from "./atoms";
+import { ExclamationTriangleFill } from "react-bootstrap-icons";
 
 const LayerSelector: React.FC = () => {
   const [layers, setLayers] = useAtom(layersAtom);
@@ -23,6 +24,7 @@ const LayerSelector: React.FC = () => {
           onClick={() => toggleLayer(layer.name)}
           type="button"
         >
+          {layer.error ? <ExclamationTriangleFill /> : null}
           {layer.name}
         </button>
       ))}

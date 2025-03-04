@@ -3,11 +3,10 @@ import ReactMarkdown from "react-markdown";
 import logo from "/logo-small.svg?url";
 import { QuestionCircleFill } from "react-bootstrap-icons";
 import useSWR from "swr";
-import { useLocation, useRoute } from "wouter";
+import { format as formatSQL } from 'sql-formatter';
+import { Link, useLocation, useRoute } from "wouter";
 import { layersAtom, SQLLayer } from "./atoms";
 import { useSetAtom } from "jotai";
-
-
 
 // Types for the API response data
 type Role = "user" | "assistant" | "system" | "tool";
@@ -124,6 +123,19 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({ onSendMessage, isLoadin
     setMessage(e.target.value);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Check for Ctrl+Enter or Cmd+Enter (for Mac)
+    if (e.ctrlKey && e.key === 'Enter') {
+      e.preventDefault();
+      if (message.trim() && !isLoading) {
+        onSendMessage(message);
+        setMessage('');
+        // Reset the height of the textarea
+        e.currentTarget.style.height = 'auto';
+      }
+    }
+  };
+
   return (
     <form onSubmit={onSubmit}>
       <div className="input-group">
@@ -135,6 +147,7 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({ onSendMessage, isLoadin
           onInput={onInput}
           value={message}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
         <button className="btn btn-primary" type="submit" disabled={isLoading}>
@@ -256,7 +269,10 @@ const ChatBox: React.FC = () => {
   // Set layers from data
   useEffect(() => {
     const messages = data?.messages;
-    if (!messages) return;
+    if (!messages) {
+      setLayers([]);
+      return;
+    }
     const layers: SQLLayer[] = [];
     // TODO: this currently overwrites the layers every time
     // we get new data. We should probably merge them instead.
@@ -296,7 +312,11 @@ const ChatBox: React.FC = () => {
         return (
           <AssistantMessage key={message.id}>
             <strong>SQL:</strong>
-            <p><code>{content.sidecar.SQLExecution[1]}</code></p>
+            <pre><code>{formatSQL(content.sidecar.SQLExecution[1], {
+              language: 'postgresql',
+              tabWidth: 2,
+              keywordCase: 'upper',
+            })}</code></pre>
           </AssistantMessage>
         );
       }
@@ -308,10 +328,10 @@ const ChatBox: React.FC = () => {
     <div className="col-4 d-flex flex-column h-100 overflow-y-auto overflow-x-hidden">
       <nav className="navbar navbar-expand-lg position-sticky top-0 bg-body bg-opacity-75">
         <div className="container-fluid">
-          <a className="navbar-brand" href="#">
+          <Link href="/" className="navbar-brand">
             <img src={logo} alt="logo" width="30" height="30" className="d-inline-block align-middle" />
             <span className="ms-1">BinaryBlackhole</span>
-          </a>
+          </Link>
         </div>
       </nav>
 

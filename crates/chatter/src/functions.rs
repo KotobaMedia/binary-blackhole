@@ -153,15 +153,37 @@ impl ExecutionContext {
     ) -> Result<ChatterMessage> {
         // simple filter: remove the trailing semicolon
         let query = params.query.trim_end_matches(';');
-        let message = format!("Database was queried successfully, and results shown to user.");
-        println!("SQL [{}]: {}", params.name, &query);
 
-        Ok(ChatterMessage {
-            message: Some(message),
-            role: Role::Tool,
-            tool_calls: None,
-            tool_call_id: Some(tool_call_id.into()),
-            sidecar: ChatterMessageSidecar::SQLExecution((params.name, query.to_string())),
-        })
+        let explain_query = format!("explain {}", query);
+        let result = self.client.query(&explain_query, &[]).await;
+
+        match result {
+            Ok(rows) => {
+                let plan = rows
+                    .iter()
+                    .map(|row| row.get::<_, String>(0))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let message = format!("Query plan:\n{}", plan);
+                println!("SQL [{}]: {}", params.name, &query);
+                return Ok(ChatterMessage {
+                    message: Some(message),
+                    role: Role::Tool,
+                    tool_calls: None,
+                    tool_call_id: Some(tool_call_id.into()),
+                    sidecar: ChatterMessageSidecar::SQLExecution((params.name, query.to_string())),
+                });
+            }
+            Err(e) => {
+                let message = format!("Failed to execute query: {}", e);
+                return Ok(ChatterMessage {
+                    message: Some(message),
+                    role: Role::Tool,
+                    tool_calls: None,
+                    tool_call_id: Some(tool_call_id.into()),
+                    sidecar: ChatterMessageSidecar::None,
+                });
+            }
+        }
     }
 }

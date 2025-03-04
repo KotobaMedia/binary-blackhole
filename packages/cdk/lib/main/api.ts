@@ -57,9 +57,6 @@ export class API extends Construct {
 
     this.apiFnUrl = this.apiFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: ['*'],
-      },
     });
   }
 }
