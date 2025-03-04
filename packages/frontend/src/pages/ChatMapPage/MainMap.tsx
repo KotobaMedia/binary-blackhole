@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Maplibre, { Source, Layer, MapRef, MapLayerMouseEvent } from 'react-map-gl/maplibre';
+import Maplibre, { Source, Layer, MapRef, MapLayerMouseEvent, StyleSpecification } from 'react-map-gl/maplibre';
 import { layersAtom, SQLLayer, selectedFeaturesAtom, SelectedFeatureInfo } from "./atoms";
 import { useAtomValue, useSetAtom } from "jotai";
+import MainMapStyle from "./MainMapStyle.json";
 import useSWR from 'swr';
 import chroma from 'chroma-js';
 
@@ -241,7 +242,7 @@ const MainMap: React.FC = () => {
   return (
     <Maplibre
       ref={mapRef}
-      mapStyle={"https://demotiles.maplibre.org/style.json"}
+      mapStyle={MainMapStyle as StyleSpecification}
       initialViewState={{
         longitude: 135,
         latitude: 37,

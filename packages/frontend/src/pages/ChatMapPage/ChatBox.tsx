@@ -309,14 +309,20 @@ const ChatBox: React.FC = () => {
           </AssistantMessage>
         );
       } else if (content.role === "tool" && content.sidecar && content.sidecar !== "None") {
+        let sqlText = content.sidecar.SQLExecution[1];
+        try {
+          formatSQL(content.sidecar.SQLExecution[1], {
+            language: 'postgresql',
+            tabWidth: 2,
+            keywordCase: 'upper',
+          });
+        } catch (e) {
+          console.error("Error formatting SQL:", e);
+        }
         return (
           <AssistantMessage key={message.id}>
             <strong>SQL:</strong>
-            <pre><code>{formatSQL(content.sidecar.SQLExecution[1], {
-              language: 'postgresql',
-              tabWidth: 2,
-              keywordCase: 'upper',
-            })}</code></pre>
+            <pre><code>{sqlText}</code></pre>
           </AssistantMessage>
         );
       }
