@@ -1,6 +1,6 @@
 //! LLM functions that will be called by the LLM runtime.
 
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use crate::{
     chatter_message::{ChatterMessage, ChatterMessageSidecar},
@@ -40,6 +40,13 @@ struct DescribeTableAttribute {
     attr_name: String,
     attr_description: String,
     attr_type: String,
+    attr_ref: Option<RefType>,
+}
+
+#[derive(Debug, Deserialize)]
+enum RefType {
+    Enum(Vec<String>),
+    Code(HashMap<String, String>),
 }
 
 impl Display for DescribeTableAttribute {
@@ -48,7 +55,26 @@ impl Display for DescribeTableAttribute {
             f,
             "`{}`: {} ({})",
             self.attr_name, self.attr_description, self.attr_type
-        )
+        )?;
+        if let Some(ref_type) = &self.attr_ref {
+            match ref_type {
+                RefType::Enum(values) => {
+                    write!(f, " possible values: {}", values.join(", "))?;
+                }
+                RefType::Code(code_map) => {
+                    write!(
+                        f,
+                        " coded values: {}",
+                        code_map
+                            .iter()
+                            .map(|(k, v)| format!("`{}`: {}", k, v))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -85,7 +111,8 @@ impl ExecutionContext {
                     jsonb_build_object(
                         'attr_name', attr.value->>'name',
                         'attr_description', attr.value->>'description',
-                        'attr_type', attr.value->>'attr_type'
+                        'attr_type', attr.value->>'attr_type',
+                        'attr_ref', attr.value->'ref'
                     )
                 ) AS attributes
             FROM datasets
@@ -154,6 +181,7 @@ impl ExecutionContext {
         // simple filter: remove the trailing semicolon
         let query = params.query.trim_end_matches(';');
 
+        // println!("Attempting to execute: {}", query);
         let explain_query = format!("explain {}", query);
         let result = self.client.query(&explain_query, &[]).await;
 
