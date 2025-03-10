@@ -1,12 +1,13 @@
 import React, { JSX, useCallback, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import logo from "/logo-small.svg?url";
 import { QuestionCircleFill } from "react-bootstrap-icons";
 import useSWR from "swr";
 import { format as formatSQL } from 'sql-formatter';
-import { Link, useLocation, useRoute } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { layersAtom, SQLLayer } from "./atoms";
 import { useSetAtom } from "jotai";
+import Header from "../../components/Header";
+import { fetcher } from "../../tools/api";
 
 // Types for the API response data
 type Role = "user" | "assistant" | "system" | "tool";
@@ -56,14 +57,6 @@ const createOptimisticAssistantTypingMessage = (lastId: number): Message => {
     }
   };
 };
-
-// SWR fetcher function
-const fetcher = (url: string) => fetch(url).then(res => {
-  if (!res.ok) {
-    throw new Error('API request failed');
-  }
-  return res.json();
-});
 
 const AssistantMessage: React.FC<React.PropsWithChildren> = ({children}) => {
   return (
@@ -182,8 +175,8 @@ const ChatBox: React.FC = () => {
   const messageContainerRef = useRef<HTMLDivElement>(null);
 
   const { data, error, isLoading, mutate } = useSWR<ThreadDetails>(
-    threadId ? `${apiUrl}/threads/${threadId}` : null,
-    fetcher
+    threadId ? `/threads/${threadId}` : null,
+    fetcher,
   );
 
   // Scroll to bottom when messages change
@@ -332,15 +325,7 @@ const ChatBox: React.FC = () => {
 
   return (
     <div className="col-4 d-flex flex-column h-100 overflow-y-auto overflow-x-hidden">
-      <nav className="navbar navbar-expand-lg position-sticky top-0 bg-body bg-opacity-75">
-        <div className="container-fluid">
-          <Link href="/" className="navbar-brand">
-            <img src={logo} alt="logo" width="30" height="30" className="d-inline-block align-middle" />
-            <span className="ms-1">BinaryBlackhole</span>
-          </Link>
-        </div>
-      </nav>
-
+      <Header />
       <div
         ref={messageContainerRef}
         className="d-flex flex-column flex-grow-1"

@@ -200,6 +200,7 @@ impl ChatThread {
         let query_builder = db
             .client
             .query()
+            .scan_index_forward(false)
             .key_condition_expression("#pk = :pk AND begins_with(#sk, :sk)")
             .expression_attribute_names("#pk", "pk")
             .expression_attribute_names("#sk", "sk")
