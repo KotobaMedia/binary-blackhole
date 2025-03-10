@@ -14,6 +14,11 @@ pub enum DataError {
     DynamoGetItemError(#[from] SdkError<operation::get_item::GetItemError>),
     #[error("DynamoDB Query Error: {0}")]
     DynamoQueryError(#[from] SdkError<operation::query::QueryError>),
+    #[error("DynamoDB UpdateItem Error: {0}")]
+    DynamoUpdateItemError(#[from] SdkError<operation::update_item::UpdateItemError>),
+
+    #[error("Optimistic lock error")]
+    OptimisticLockFailed,
 
     #[error("Document not found")]
     DocumentNotFound,

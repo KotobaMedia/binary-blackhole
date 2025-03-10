@@ -31,6 +31,7 @@ type ThreadDetails = {
   id: string;
   title: string;
   messages: Message[];
+  archived?: boolean;
 };
 
 type CreateThreadResponse = {
@@ -174,17 +175,52 @@ const ChatBox: React.FC = () => {
   const apiUrl = import.meta.env.VITE_API_URL;
   const messageContainerRef = useRef<HTMLDivElement>(null);
 
-  const { data, error, isLoading, mutate } = useSWR<ThreadDetails>(
+  const { data: threadDetails, error, isLoading, mutate } = useSWR<ThreadDetails>(
     threadId ? `/threads/${threadId}` : null,
     fetcher,
   );
 
+  // Hidden console API to archive the thread
+  useEffect(() => {
+    if (!threadId) return;
+
+    (window as any).__archiveThread = async () => {
+      if (threadDetails?.archived) {
+        console.warn("Thread is already archived");
+        return;
+      }
+
+      const response = await fetch(`${apiUrl}/threads/${threadId}/archive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error("Failed to archive thread");
+        return;
+      }
+
+      mutate((prevData) => {
+        if (!prevData) return prevData;
+        return {
+          ...prevData,
+          archived: true,
+        };
+      }, false);
+    };
+    return () => {
+      (window as any).__archiveThread = undefined;
+    }
+  }, [threadId]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (messageContainerRef.current && data?.messages.length) {
+    if (messageContainerRef.current && threadDetails?.messages.length) {
       messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
     }
-  }, [data?.messages]);
+  }, [threadDetails?.messages]);
 
   const handleSendMessage = async (message: string) => {
     setIsSending(true);
@@ -219,13 +255,13 @@ const ChatBox: React.FC = () => {
         mutate();
       } else {
         // Get the last message ID to generate unique IDs for optimistic updates
-        const lastId = data?.messages.length ? data.messages[data.messages.length - 1].id : 0;
+        const lastId = threadDetails?.messages.length ? threadDetails.messages[threadDetails.messages.length - 1].id : 0;
 
         // Create optimistic data by adding the new message to existing messages
         const optimisticData: ThreadDetails = {
-          ...(data as ThreadDetails),
+          ...(threadDetails as ThreadDetails),
           messages: [
-            ...(data?.messages || []),
+            ...(threadDetails?.messages || []),
             createOptimisticUserMessage(message, lastId),
             createOptimisticAssistantTypingMessage(lastId)
           ]
@@ -261,7 +297,7 @@ const ChatBox: React.FC = () => {
 
   // Set layers from data
   useEffect(() => {
-    const messages = data?.messages;
+    const messages = threadDetails?.messages;
     if (!messages) {
       setLayers([]);
       return;
@@ -282,11 +318,11 @@ const ChatBox: React.FC = () => {
       }
     }
     setLayers(layers);
-  }, [data?.messages, setLayers]);
+  }, [threadDetails?.messages, setLayers]);
 
   // Map the messages from the API response to UI components
-  if (data) {
-    messages = data.messages.map(message => {
+  if (threadDetails) {
+    messages = threadDetails.messages.map(message => {
       const { content } = message;
 
       if (content.role === "user") {
@@ -346,9 +382,11 @@ const ChatBox: React.FC = () => {
 
         {messages}
 
-        <div className="position-sticky bottom-0 mt-auto py-3 bg-body bg-opacity-75">
-          <SendMessageBox onSendMessage={handleSendMessage} isLoading={isSending} />
-        </div>
+        {!threadDetails?.archived && (
+          <div className="position-sticky bottom-0 mt-auto py-3 bg-body bg-opacity-75">
+            <SendMessageBox onSendMessage={handleSendMessage} isLoading={isSending} />
+          </div>
+        )}
       </div>
     </div>
   );

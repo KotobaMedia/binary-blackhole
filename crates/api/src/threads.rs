@@ -9,7 +9,9 @@ use axum::{
     routing::{get, post},
 };
 use chatter::chatter_message::{ChatterMessage, ChatterMessageSidecar, Role};
-use data::dynamodb::{ChatMessage, ChatMessageBuilder, ChatThread, ChatThreadBuilder};
+use chrono::Utc;
+use data::types::chat_message::{ChatMessage, ChatMessageBuilder};
+use data::types::chat_thread::{ChatThread, ChatThreadBuilder};
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
@@ -85,6 +87,7 @@ impl From<ChatMessage> for Message {
 struct ThreadDetails {
     id: String,
     title: String,
+    archived: Option<bool>,
     messages: Vec<Message>,
 }
 
@@ -99,6 +102,7 @@ async fn get_thread_handler(
     Ok(ThreadDetails {
         id: thread.id().to_string(),
         title: thread.title,
+        archived: thread.archived,
         messages: messages
             .into_iter()
             .map(Into::into)
@@ -130,8 +134,9 @@ async fn create_new_thread_handler(
         .id(thread_id.to_string())
         .user_id("demo_user".to_string())
         .title(thread_id.to_string())
+        .modified_ts(Utc::now())
         .build()?;
-    state.db.put_item_excl(thread).await?;
+    state.db.put_item_excl(&thread).await?;
 
     // TODO: async
     let mut chatter = state.chatter.lock().await;
@@ -155,7 +160,7 @@ async fn create_new_thread_handler(
         })
         .collect::<Result<Vec<ChatMessage>>>()?;
     for message in messages {
-        state.db.put_item_excl(message).await?;
+        state.db.put_item_excl(&message).await?;
     }
 
     Ok((
@@ -167,12 +172,32 @@ async fn create_new_thread_handler(
         .into_response())
 }
 
+async fn archive_thread_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Response> {
+    let thread_id = Ulid::from_string(&id).context("Invalid thread ID")?;
+    let mut thread = ChatThread::get_thread(&state.db, "demo_user", &thread_id.to_string()).await?;
+    let ts = thread.modified_ts;
+    thread.archived = Some(true);
+    thread.modified_ts = Utc::now();
+
+    state.db.put_item_lock(&thread, "modified_ts", &ts).await?;
+
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
 async fn create_thread_message_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(payload): Json<CreateNewThreadRequest>,
 ) -> Result<Response> {
     let thread_id = Ulid::from_string(&id).context("Invalid thread ID")?;
+
+    let thread = ChatThread::get_thread(&state.db, "demo_user", &thread_id.to_string()).await?;
+    if thread.archived.unwrap_or(false) == true {
+        return Err(AppError::Conflict("thread_archived".to_string()));
+    }
 
     // Get the messages for the thread so we can re-instantiate the context
     let messages =
@@ -208,7 +233,7 @@ async fn create_thread_message_handler(
         })
         .collect::<Result<Vec<ChatMessage>>>()?;
     for message in messages {
-        state.db.put_item_excl(message).await?;
+        state.db.put_item_excl(&message).await?;
     }
 
     Ok((
@@ -226,4 +251,5 @@ pub fn threads_routes() -> Router<AppState> {
         .route("/threads", post(create_new_thread_handler))
         .route("/threads/{id}", get(get_thread_handler))
         .route("/threads/{id}/message", post(create_thread_message_handler))
+        .route("/threads/{id}/archive", post(archive_thread_handler))
 }
