@@ -24,6 +24,9 @@ export class MainStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'APIFnUrl', {
       value: api.apiFnUrl.url,
     });
+    new cdk.CfnOutput(this, 'StreamingFnUrl', {
+      value: api.streamingFnUrl.url,
+    });
 
     new cdk.CfnOutput(this, 'VpcId', {
       value: vpc.vpc.vpcId,

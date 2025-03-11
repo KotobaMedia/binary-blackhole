@@ -17,6 +17,8 @@ type APIProps = {
 export class API extends Construct {
   apiFn: RustFunction;
   apiFnUrl: lambda.FunctionUrl;
+  streamingFn: RustFunction;
+  streamingFnUrl: lambda.FunctionUrl;
   securityGroup: ec2.SecurityGroup;
 
   constructor(scope: Construct, id: string, { mainTable, vpc, rds }: APIProps) {
@@ -57,6 +59,32 @@ export class API extends Construct {
 
     this.apiFnUrl = this.apiFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
+    });
+
+    this.streamingFn = new RustFunction(this, 'API', {
+      binaryName: 'api-streaming',
+      manifestPath: path.join(__dirname, '../../../../Cargo.toml'),
+      architecture: lambda.Architecture.ARM_64,
+      environment: {
+        TABLE_NAME: mainTable.tableName,
+        POSTGRES_CONN_STR: connStr,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
+      },
+      memorySize: 512,
+      timeout: Duration.seconds(30),
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      ipv6AllowedForDualStack: true,
+      securityGroups: [this.securityGroup],
+    });
+
+    mainTable.grantReadWriteData(this.streamingFn);
+
+    this.streamingFnUrl = this.streamingFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
     });
   }
 }
