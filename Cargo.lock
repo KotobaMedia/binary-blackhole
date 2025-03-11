@@ -129,11 +129,13 @@ dependencies = [
  "geo",
  "geo-types",
  "geojson",
+ "hyper 1.6.0",
  "lambda_http",
  "serde",
  "serde_json",
  "tokio",
  "tokio-stream",
+ "tower 0.5.2",
  "tower-http",
  "ulid",
 ]

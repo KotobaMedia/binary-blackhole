@@ -1,11 +1,13 @@
 use axum::{
-    Json,
+    body::Body,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "streaming")]
+use futures::stream;
 use lambda_http::tracing;
 use serde_json::json;
-use std::fmt;
+use std::{convert::Infallible, fmt};
 
 pub type Result<T> = std::result::Result<T, AppError>;
 
@@ -17,22 +19,37 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        match self {
+        // Create a status and a body message from the error variant.
+        let (status, message) = match self {
             AppError::InternalServerError(error) => {
                 tracing::error!("Unhandled error: {:?}", error);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Something went wrong. Please try again later."),
+                    "Something went wrong. Please try again later.".to_string(),
                 )
-                    .into_response()
             }
-            AppError::Conflict(code) => (
-                StatusCode::CONFLICT,
-                Json(json!({
-                    "error_code": code,
-                })),
-            )
-                .into_response(),
+            AppError::Conflict(code) => {
+                let json_body = json!({ "error_code": code });
+                let message =
+                    serde_json::to_string(&json_body).unwrap_or_else(|_| "Conflict".into());
+                (StatusCode::CONFLICT, message)
+            }
+        };
+
+        // If streaming is enabled, wrap the string in a stream body;
+        // otherwise, use the standard response.
+        #[cfg(feature = "streaming")]
+        {
+            let stream = stream::once(async move { Ok::<_, Infallible>(message) });
+            Response::builder()
+                .status(status)
+                .body(Body::from_stream(stream))
+                .unwrap()
+        }
+
+        #[cfg(not(feature = "streaming"))]
+        {
+            (status, message).into_response()
         }
     }
 }

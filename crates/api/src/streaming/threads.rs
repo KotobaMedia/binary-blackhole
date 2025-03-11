@@ -58,6 +58,15 @@ async fn create_thread_message_handler(
             chatter.new_context().await?;
         }
         chatter.context.add_user_message(&payload.content);
+        let messages = &chatter.context.messages;
+        let msg = messages.last().unwrap();
+        let mut binding = ChatMessageBuilder::default();
+        binding
+            .thread_message_ids(thread_id.to_string(), messages.len() as u32 - 1)
+            .user_id("demo_user".to_string())
+            .msg(msg.clone());
+        let message = binding.build()?;
+        state.db.put_item_excl(&message).await?;
 
         chatter.execute_stream()
     };

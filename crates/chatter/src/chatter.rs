@@ -108,7 +108,6 @@ impl Chatter {
                     yield tool_response;
                 } else {
                     // No tool call, we're done
-                    yield message.try_into()?;
                     break;
                 }
             }

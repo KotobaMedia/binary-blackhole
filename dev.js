@@ -32,13 +32,13 @@ function getDynamoDBCommand() {
 const { result } = concurrently([
   { command: 'cd packages/frontend && pnpm dev', name: 'frontend', prefixColor: 'blue' },
   {
-    command: 'cargo lambda watch --bin api',
+    command: 'cargo lambda watch --bin api -P 9000',
     name: 'backend',
     prefixColor: 'green',
     env: { RUST_BACKTRACE: '1' }
   },
   {
-    command: 'cargo lambda watch --bin api-streaming --features="streaming"',
+    command: 'cargo lambda watch --bin api-streaming --features="streaming" -P 8999',
     name: 'backend-streaming',
     prefixColor: 'green',
     env: { RUST_BACKTRACE: '1' }
