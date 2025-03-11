@@ -37,6 +37,12 @@ const { result } = concurrently([
     prefixColor: 'green',
     env: { RUST_BACKTRACE: '1' }
   },
+  {
+    command: 'cargo lambda watch --bin api-streaming --features="streaming"',
+    name: 'backend-streaming',
+    prefixColor: 'green',
+    env: { RUST_BACKTRACE: '1' }
+  },
   { command: getDynamoDBCommand(), name: 'dynamodb', prefixColor: 'yellow' }
 ], {
   killOthers: ['failure', 'success'],

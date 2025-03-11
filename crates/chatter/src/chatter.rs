@@ -2,6 +2,7 @@ use std::{env, sync::Arc};
 
 use crate::{
     chatter_context::ChatterContext,
+    chatter_message::{self, ChatterMessage},
     error::Result,
     functions::{ExecutionContext, ExecutionContextBuilder},
     geom::GeometryWrapper,
@@ -10,6 +11,8 @@ use async_openai::types::{
     ChatCompletionMessageToolCall, ChatCompletionRequestMessage, ChatCompletionResponseMessage,
     CreateChatCompletionRequestArgs,
 };
+use async_stream::try_stream;
+use futures::Stream;
 use geo_types::Geometry;
 use tokio_postgres::NoTls;
 
@@ -18,6 +21,7 @@ pub struct QueryResultRow {
     pub properties: serde_json::Value,
 }
 
+#[derive(Clone)]
 pub struct Chatter {
     pub context: ChatterContext,
     pub client: async_openai::Client<async_openai::config::OpenAIConfig>,
@@ -62,7 +66,58 @@ impl Chatter {
         self.context = context;
     }
 
+    #[deprecated]
     pub async fn execute(&mut self) -> Result<ChatCompletionResponseMessage> {
+        loop {
+            let message = self.create_and_send_request().await?;
+
+            // Add the AI response to the context
+            self.context.add_message(message.clone().try_into()?);
+
+            if let Some(tool_calls) = message.tool_calls {
+                // Execute the tool call and get the response message
+                let tool_response = self.execute_tool_call(tool_calls[0].clone()).await?;
+
+                // Add the tool response to the context
+                self.context.add_message(tool_response);
+
+                // Continue the loop to process the next message
+            } else {
+                // No tool call, we're done
+                return Ok(message);
+            }
+        }
+    }
+
+    pub fn execute_stream(mut self) -> impl Stream<Item = Result<ChatterMessage>> {
+        try_stream! {
+            loop {
+                let message = self.create_and_send_request().await?;
+
+                // Add the AI response to the context
+                let cmessage: ChatterMessage = message.clone().try_into()?;
+                self.context.add_message(cmessage.clone());
+                yield cmessage;
+
+                if let Some(tool_calls) = message.tool_calls {
+                    // Execute the tool call and get the response message
+                    let tool_response = self.execute_tool_call(tool_calls[0].clone()).await?;
+
+                    // Add the tool response to the context
+                    self.context.add_message(tool_response.clone());
+                    yield tool_response;
+                } else {
+                    // No tool call, we're done
+                    yield message.try_into()?;
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Creates and sends a chat completion request, then returns the message from the response.
+    async fn create_and_send_request(&mut self) -> Result<ChatCompletionResponseMessage> {
+        // Create the chat completion request
         let request = CreateChatCompletionRequestArgs::default()
             .max_completion_tokens(2048u32)
             .temperature(0.2)
@@ -77,43 +132,36 @@ impl Chatter {
             .tools(self.context.tools.clone())
             .parallel_tool_calls(false) // We only want to run one tool at a time
             .build()?;
-        // println!("Sending request: {}", serde_json::to_string(&request)?);
+
+        // Send the request and get the response
         let response = self.client.chat().create(request).await?;
         let choice = response.choices[0].clone();
-        self.context.add_message(choice.message.clone().try_into()?);
-        let message = choice.message;
-        // If the message is a tool call, we need to execute the tool and re-run the model.
-        // Because we have parallel set as false, we know there is only one tool call.
-        if let Some(tool_calls) = message.tool_calls {
-            self.execute_tool_call(tool_calls[0].clone()).await?;
-            Box::pin(self.execute()).await
-        } else {
-            Ok(message)
-        }
+
+        Ok(choice.message)
     }
 
-    async fn execute_tool_call(&mut self, tool_call: ChatCompletionMessageToolCall) -> Result<()> {
+    /// Executes a tool call and returns the response message
+    async fn execute_tool_call(
+        &mut self,
+        tool_call: ChatCompletionMessageToolCall,
+    ) -> Result<chatter_message::ChatterMessage> {
         let call = tool_call.function;
         let id = tool_call.id;
-        let response = match call.name.as_str() {
+        match call.name.as_str() {
             "describe_tables" => {
                 let args = serde_json::from_str(&call.arguments)?;
                 let response = self.func_ctx.describe_tables(&id, args).await?;
-                response.into()
+                Ok(response.into())
             }
             "query_database" => {
                 let args = serde_json::from_str(&call.arguments)?;
                 let response = self.func_ctx.query_database(&id, args).await?;
-                response.into()
+                Ok(response.into())
             }
-            other => {
-                return Err(crate::error::ChatterError::UnknownToolCall(
-                    other.to_string(),
-                ));
-            }
-        };
-        self.context.add_message(response);
-        Ok(())
+            other => Err(crate::error::ChatterError::UnknownToolCall(
+                other.to_string(),
+            )),
+        }
     }
 
     /// Execute a SQL query and return the result. Used by the API to execute queries.

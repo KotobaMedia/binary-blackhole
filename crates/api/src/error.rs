@@ -5,9 +5,11 @@ use axum::{
 };
 use lambda_http::tracing;
 use serde_json::json;
+use std::fmt;
 
 pub type Result<T> = std::result::Result<T, AppError>;
 
+#[derive(Debug)]
 pub enum AppError {
     InternalServerError(anyhow::Error),
     Conflict(String),
@@ -43,5 +45,14 @@ where
 {
     fn from(err: E) -> Self {
         Self::InternalServerError(err.into())
+    }
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AppError::InternalServerError(error) => write!(f, "Internal server error: {}", error),
+            AppError::Conflict(code) => write!(f, "Conflict: {}", code),
+        }
     }
 }

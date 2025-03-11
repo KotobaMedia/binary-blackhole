@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_postgres::types::Json;
 
-#[derive(Builder)]
+#[derive(Builder, Clone)]
 #[builder(pattern = "owned")]
 pub struct ExecutionContext {
     client: Arc<tokio_postgres::Client>,

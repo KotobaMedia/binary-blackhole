@@ -78,6 +78,11 @@ export class API extends Construct {
       },
       ipv6AllowedForDualStack: true,
       securityGroups: [this.securityGroup],
+      bundling: {
+        cargoLambdaFlags: [
+          '--features=streaming',
+        ],
+      },
     });
 
     mainTable.grantReadWriteData(this.streamingFn);

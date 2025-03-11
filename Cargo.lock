@@ -120,31 +120,15 @@ name = "api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "axum",
- "chatter",
- "chrono",
- "data",
- "geo",
- "geo-types",
- "geojson",
- "lambda_http",
- "serde",
- "serde_json",
- "tokio",
- "tower-http",
- "ulid",
-]
-
-[[package]]
-name = "api-streaming"
-version = "0.1.0"
-dependencies = [
- "anyhow",
+ "async-stream",
  "axum",
  "chatter",
  "chrono",
  "data",
  "futures",
+ "geo",
+ "geo-types",
+ "geojson",
  "lambda_http",
  "serde",
  "serde_json",
@@ -761,7 +745,9 @@ name = "chatter"
 version = "0.1.0"
 dependencies = [
  "async-openai",
+ "async-stream",
  "derive_builder",
+ "futures",
  "geo-traits",
  "geo-types",
  "schemars",
@@ -770,6 +756,7 @@ dependencies = [
  "thiserror 2.0.11",
  "tokio",
  "tokio-postgres",
+ "tokio-stream",
  "ulid",
  "wkb",
 ]

@@ -5,6 +5,15 @@ edition = "2024"
 license.workspace = true
 authors.workspace = true
 
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
+[[bin]]
+name = "api-streaming"
+path = "src/main_streaming.rs"
+required-features = ["streaming"]
+
 [dependencies]
 data = { path = "../data" }
 chatter = { path = "../chatter" }
@@ -22,3 +31,10 @@ geojson = "0.24.2"
 geo = "0.29"
 geo-types = "0.7"
 chrono = { version = "0.4.40", features = ["serde"] }
+futures = { version = "0.3.31", optional = true }
+tokio-stream = { version = "0.1.17", optional = true }
+async-stream = { version = "0.3.6", optional = true }
+
+[features]
+all = ["streaming"]
+streaming = ["dep:tokio-stream", "dep:futures", "dep:async-stream"]
