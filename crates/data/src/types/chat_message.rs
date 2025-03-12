@@ -8,7 +8,7 @@ use aws_sdk_dynamodb::types::AttributeValue;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Builder, Clone)]
+#[derive(Serialize, Deserialize, Builder, Clone, Debug)]
 pub struct ChatMessage {
     /// `User#<user_id>`
     #[builder(setter(custom))]

@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use crate::{
-    data::threads::{Message, Thread, ThreadDetails, ThreadList},
+    data::threads::{MessageView, Thread, ThreadDetails, ThreadList},
     error::Result,
 };
 use anyhow::Context;
@@ -38,7 +38,7 @@ async fn get_thread_handler(
         messages: messages
             .into_iter()
             .map(Into::into)
-            .filter(|m: &Message| {
+            .filter(|m: &MessageView| {
                 m.content.role != chatter::chatter_message::Role::System
                     && (!m.content.sidecar.is_none() || !m.content.message.is_none())
             })

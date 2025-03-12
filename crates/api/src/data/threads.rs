@@ -52,11 +52,11 @@ impl From<ChatterMessage> for ChatterMessageView {
 }
 
 #[derive(Serialize)]
-pub struct Message {
+pub struct MessageView {
     pub id: u32,
     pub content: ChatterMessageView,
 }
-impl From<ChatMessage> for Message {
+impl From<ChatMessage> for MessageView {
     fn from(message: ChatMessage) -> Self {
         Self {
             id: message.id(),
@@ -70,5 +70,5 @@ pub struct ThreadDetails {
     pub id: String,
     pub title: String,
     pub archived: Option<bool>,
-    pub messages: Vec<Message>,
+    pub messages: Vec<MessageView>,
 }

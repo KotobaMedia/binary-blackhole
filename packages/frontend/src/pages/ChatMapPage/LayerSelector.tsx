@@ -16,11 +16,11 @@ const LayerSelector: React.FC = () => {
   }, [setLayers]);
 
   return (
-    <div className="d-flex flex-wrap gap-2 px-2">
+    <div className="d-flex flex-wrap gap-2 p-2">
       {layers.map((layer) => (
         <button
           key={layer.name}
-          className={`btn btn-sm my-2 ${layer.enabled ? 'btn-primary' : 'btn-outline-secondary'}`}
+          className={`btn btn-sm py-0 ${layer.enabled ? 'btn-primary' : 'btn-outline-secondary'}`}
           onClick={() => toggleLayer(layer.name)}
           type="button"
         >

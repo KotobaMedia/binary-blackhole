@@ -152,7 +152,7 @@ impl ExecutionContext {
             role: Role::Tool,
             tool_calls: None,
             tool_call_id: Some(tool_call_id.into()),
-            sidecar: ChatterMessageSidecar::None,
+            sidecar: ChatterMessageSidecar::DatabaseLookup,
         })
     }
 

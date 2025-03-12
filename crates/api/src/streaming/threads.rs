@@ -1,27 +1,24 @@
-use std::convert::Infallible;
-
-use crate::error::{AppError, Result};
+use crate::data::threads::MessageView;
+use crate::error::AppError;
 use crate::state::AppState;
 use anyhow::Context;
-use axum::Error;
 use axum::body::{Body, Bytes};
 use axum::http::header;
 use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
-    routing::{get, post},
+    response::IntoResponse,
+    routing::post,
 };
 use chatter::chatter_context::ChatterContext;
-use chatter::chatter_message::{ChatterMessage, ChatterMessageSidecar, Role};
-use chrono::Utc;
+use chatter::chatter_message::Role;
 use data::types::chat_message::{ChatMessage, ChatMessageBuilder};
-use data::types::chat_thread::{ChatThread, ChatThreadBuilder};
-use futures::StreamExt;
-use futures::stream::TryStreamExt;
+use data::types::chat_thread::ChatThread;
+use futures::{StreamExt, future};
 use serde::Deserialize;
 use serde_json::json;
+use std::convert::Infallible;
 use ulid::Ulid;
 
 #[derive(Deserialize)]
@@ -45,6 +42,7 @@ async fn create_thread_message_handler(
     let messages =
         ChatMessage::get_all_thread_messages(&state.db, "demo_user", &thread_id.to_string())
             .await?;
+    let thread_message_count = messages.len() as u32;
 
     let stream = {
         let mut chatter = state.chatter.lock().await.clone();
@@ -58,15 +56,15 @@ async fn create_thread_message_handler(
             chatter.new_context().await?;
         }
         chatter.context.add_user_message(&payload.content);
-        let messages = &chatter.context.messages;
-        let msg = messages.last().unwrap();
-        let mut binding = ChatMessageBuilder::default();
-        binding
-            .thread_message_ids(thread_id.to_string(), messages.len() as u32 - 1)
-            .user_id("demo_user".to_string())
-            .msg(msg.clone());
-        let message = binding.build()?;
-        state.db.put_item_excl(&message).await?;
+        // let messages = &chatter.context.messages;
+        // let msg = messages.last().unwrap();
+        // let mut binding = ChatMessageBuilder::default();
+        // binding
+        //     .thread_message_ids(thread_id.to_string(), messages.len() as u32 - 1)
+        //     .user_id("demo_user".to_string())
+        //     .msg(msg.clone());
+        // let message = binding.build()?;
+        // state.db.put_item_excl(&message).await?;
 
         chatter.execute_stream()
     };
@@ -78,33 +76,44 @@ async fn create_thread_message_handler(
             let message = m?;
             let mut binding = ChatMessageBuilder::default();
             let builder = binding
-                .thread_message_ids(thread_id.to_string(), i as u32)
+                .thread_message_ids(thread_id.to_string(), thread_message_count + i as u32)
                 .user_id("demo_user".to_string())
                 .msg(message.clone());
-            let message = builder.build()?;
-            Ok::<_, AppError>(message)
+            let db_message = builder.build()?;
+            Ok::<_, AppError>(db_message)
         })
         .then(move |m| {
             let value = db.clone();
             async move {
-                let message = m?;
-                value.put_item_excl(&message).await?;
-                Ok::<_, AppError>(message)
+                let db_message = m?;
+                value.put_item_excl(&db_message).await?;
+                Ok::<_, AppError>(db_message)
             }
+        })
+        .filter(|m| {
+            // Filter out system messages.
+            let resp = if let Ok(db_message) = m {
+                db_message.msg.role != Role::System
+            } else {
+                // Keep errors in the stream.
+                true
+            };
+            future::ready(resp)
         })
         .map(|m| {
             let message = m?;
-            let message_json = serde_json::to_string(&message)?;
-            Ok::<_, AppError>(Bytes::from(message_json))
+
+            let message_view: MessageView = message.into();
+            let message_json = serde_json::to_string(&message_view)?;
+            Ok::<_, AppError>(Bytes::from(message_json + "\n"))
         })
-        .take_while(|res| std::future::ready(res.is_ok()))
         .map(|res| {
             Ok::<_, Infallible>(res.unwrap_or_else(|err| {
                 let value = json!({
                     "error": err.to_string(),
                 });
                 let error_json = serde_json::to_string(&value).unwrap();
-                Bytes::from(error_json)
+                Bytes::from(error_json + "\n")
             }))
         });
 

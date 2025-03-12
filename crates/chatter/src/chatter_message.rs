@@ -13,7 +13,12 @@ pub type Role = OpenAIRole;
 pub enum ChatterMessageSidecar {
     #[default]
     None,
+
+    /// Execute some SQL. (name, SQL query)
     SQLExecution((String, String)),
+
+    /// A database lookup.
+    DatabaseLookup,
 }
 
 impl ChatterMessageSidecar {

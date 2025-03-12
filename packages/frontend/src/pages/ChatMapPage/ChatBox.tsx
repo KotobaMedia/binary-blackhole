@@ -7,14 +7,19 @@ import { useLocation, useRoute } from "wouter";
 import { layersAtom, SQLLayer } from "./atoms";
 import { useSetAtom } from "jotai";
 import Header from "../../components/Header";
-import { fetcher } from "../../tools/api";
+import { fetcher, streamJsonLines } from "../../tools/api";
 
 // Types for the API response data
 type Role = "user" | "assistant" | "system" | "tool";
 
-type ChatterMessageSidecar = "None" | {
+type ChatterMessageSidecar = "None" | "DatabaseLookup" | {
   "SQLExecution": [string, string];
 };
+function isSidecarSQLExecution(
+  sidecar?: ChatterMessageSidecar,
+): sidecar is { "SQLExecution": [string, string] } {
+  return typeof sidecar === "object" && sidecar && "SQLExecution" in sidecar;
+}
 
 type ChatterMessageView = {
   message?: string;
@@ -36,27 +41,6 @@ type ThreadDetails = {
 
 type CreateThreadResponse = {
   thread_id: string;
-};
-
-// Helper functions for optimistic updates
-const createOptimisticUserMessage = (message: string, lastId: number): Message => {
-  return {
-    id: lastId + 1,
-    content: {
-      message,
-      role: "user"
-    }
-  };
-};
-
-const createOptimisticAssistantTypingMessage = (lastId: number): Message => {
-  return {
-    id: lastId + 2,
-    content: {
-      message: "...",
-      role: "assistant"
-    }
-  };
 };
 
 const AssistantMessage: React.FC<React.PropsWithChildren> = ({children}) => {
@@ -222,68 +206,54 @@ const ChatBox: React.FC = () => {
     }
   }, [threadDetails?.messages]);
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = useCallback(async (message: string) => {
     setIsSending(true);
 
     try {
+      let createdThreadId = threadId;
       if (!threadId) {
-        // Create a new thread with the first message
-        // Optimistically show the user message
-        const optimisticData: ThreadDetails = {
-          id: 'temp-thread',
-          title: 'New Conversation',
-          messages: [createOptimisticUserMessage(message, 0)]
-        };
-
-        // Optimistically update the UI
-        mutate(optimisticData, false);
-
         const response = await fetch(`${apiUrl}/threads`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ content: message }),
+          body: JSON.stringify({}),
         });
 
         if (!response.ok) throw new Error('Failed to create thread');
 
         const data: CreateThreadResponse = await response.json();
-        setThreadId(data.thread_id);
-
-        // Now fetch the real thread data
-        mutate();
-      } else {
-        // Get the last message ID to generate unique IDs for optimistic updates
-        const lastId = threadDetails?.messages.length ? threadDetails.messages[threadDetails.messages.length - 1].id : 0;
-
-        // Create optimistic data by adding the new message to existing messages
-        const optimisticData: ThreadDetails = {
-          ...(threadDetails as ThreadDetails),
-          messages: [
-            ...(threadDetails?.messages || []),
-            createOptimisticUserMessage(message, lastId),
-            createOptimisticAssistantTypingMessage(lastId)
-          ]
-        };
-
-        // Update the UI optimistically
-        mutate(optimisticData, false);
-
-        // Send message to existing thread
-        const response = await fetch(`${apiUrl}/threads/${threadId}/message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ content: message }),
-        });
-
-        if (!response.ok) throw new Error('Failed to send message');
-
-        // Refresh the thread data to show the actual response
-        await mutate();
+        createdThreadId = data.thread_id;
       }
+      if (!createdThreadId) throw new Error('Failed to create thread');
+
+      const messageStream = streamJsonLines<Message>(`/threads/${createdThreadId}/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: message,
+        }),
+      });
+      for await (const message of messageStream) {
+        // Optimistically update the UI with the new message
+        mutate((prevData) => {
+          if (!prevData) return prevData;
+          const newMessages = [...prevData.messages, message];
+          return {
+            ...prevData,
+            messages: newMessages,
+          };
+        }, false);
+      }
+
+      if (createdThreadId !== threadId) {
+        // If we created a new thread, update the URL
+        setThreadId(createdThreadId);
+      }
+      // After we get the last message, everything should be in sync, but we'll run a mutate just in case.
+      mutate();
     } catch (error) {
       console.error("Error sending message:", error);
       // If there was an error, revalidate to restore the correct state
@@ -291,7 +261,7 @@ const ChatBox: React.FC = () => {
     } finally {
       setIsSending(false);
     }
-  };
+  }, [threadId, setThreadId]);
 
   let messages: JSX.Element[] = [];
 
@@ -308,7 +278,7 @@ const ChatBox: React.FC = () => {
     // also, save the enabled state between refreshes
     for (const message of messages) {
       const { content } = message;
-      if (content.role === "tool" && content.sidecar && content.sidecar !== "None") {
+      if (content.role === "tool" && isSidecarSQLExecution(content.sidecar)) {
         const execution = content.sidecar.SQLExecution;
         layers.push({
           name: execution[0],
@@ -337,7 +307,13 @@ const ChatBox: React.FC = () => {
             <ReactMarkdown>{content.message}</ReactMarkdown>
           </AssistantMessage>
         );
-      } else if (content.role === "tool" && content.sidecar && content.sidecar !== "None") {
+      } else if (content.role === "tool" && content.sidecar === "DatabaseLookup") {
+        return (
+          <AssistantMessage key={message.id}>
+            <strong>データベース確認中...</strong>
+          </AssistantMessage>
+        );
+      } else if (content.role === "tool" && isSidecarSQLExecution(content.sidecar)) {
         let sqlText = content.sidecar.SQLExecution[1];
         try {
           sqlText = formatSQL(content.sidecar.SQLExecution[1], {
@@ -360,10 +336,9 @@ const ChatBox: React.FC = () => {
   }
 
   return (
-    <div className="col-4 d-flex flex-column h-100 overflow-y-auto overflow-x-hidden">
+    <div ref={messageContainerRef} className="col-4 d-flex flex-column h-100 overflow-y-auto overflow-x-hidden">
       <Header />
       <div
-        ref={messageContainerRef}
         className="d-flex flex-column flex-grow-1"
       >
         {(isLoading && threadId) && (

@@ -91,6 +91,11 @@ impl Chatter {
 
     pub fn execute_stream(mut self) -> impl Stream<Item = Result<ChatterMessage>> {
         try_stream! {
+            let last_message = self.context.messages.last().cloned();
+            if let Some(last_message) = last_message {
+                yield last_message;
+            }
+
             loop {
                 let message = self.create_and_send_request().await?;
 
@@ -106,8 +111,10 @@ impl Chatter {
                     // Add the tool response to the context
                     self.context.add_message(tool_response.clone());
                     yield tool_response;
+
+                    // Continue the loop to process the next message
                 } else {
-                    // No tool call, we're done
+                    // No tool call, that means that the assistant has finished.
                     break;
                 }
             }
@@ -143,7 +150,7 @@ impl Chatter {
     async fn execute_tool_call(
         &mut self,
         tool_call: ChatCompletionMessageToolCall,
-    ) -> Result<chatter_message::ChatterMessage> {
+    ) -> Result<ChatterMessage> {
         let call = tool_call.function;
         let id = tool_call.id;
         match call.name.as_str() {
