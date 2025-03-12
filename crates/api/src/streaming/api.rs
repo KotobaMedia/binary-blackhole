@@ -4,7 +4,7 @@ use crate::state::AppState;
 use async_stream::stream;
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{Method, StatusCode};
+use axum::http::{Method, StatusCode, header};
 use axum::response::IntoResponse;
 use axum::{Router, routing::get};
 use std::convert::Infallible;
@@ -33,7 +33,12 @@ async fn health(State(state): State<AppState>) -> AppResult<impl IntoResponse> {
         yield Ok::<_, Infallible>("OK".to_string());
     };
     let body = Body::from_stream(stream);
-    Ok((StatusCode::OK, body).into_response())
+    Ok((
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        body,
+    )
+        .into_response())
 }
 
 pub async fn create_api() -> Router {

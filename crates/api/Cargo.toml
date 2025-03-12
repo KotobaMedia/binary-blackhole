@@ -34,8 +34,6 @@ chrono = { version = "0.4.40", features = ["serde"] }
 futures = { version = "0.3.31", optional = true }
 tokio-stream = { version = "0.1.17", optional = true }
 async-stream = { version = "0.3.6", optional = true }
-hyper = "1.6.0"
-tower = "0.5.2"
 
 [features]
 all = ["streaming"]

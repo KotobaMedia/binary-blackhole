@@ -61,7 +61,7 @@ export class API extends Construct {
       authType: lambda.FunctionUrlAuthType.NONE,
     });
 
-    this.streamingFn = new RustFunction(this, 'API', {
+    this.streamingFn = new RustFunction(this, 'APIStreaming', {
       binaryName: 'api-streaming',
       manifestPath: path.join(__dirname, '../../../../Cargo.toml'),
       architecture: lambda.Architecture.ARM_64,
