@@ -9,7 +9,7 @@ import {
   detailPaneVisibleAtom,
 } from "./ChatMapPage/atoms";
 // import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
-import "./ChatMapPage/style.css";
+import "./ChatMapPage/style.scss";
 import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
 
 const ChatMapPage: React.FC = () => {
@@ -21,6 +21,7 @@ const ChatMapPage: React.FC = () => {
       <div
         className={c("row vh-100 vw-100 flex-nowrap chat-map-page-container", {
           "slide-left": detailPaneVisible,
+          fullscreen: detailPaneFullscreen,
         })}
       >
         <div className={c("col-6 p-0 h-100")}>
@@ -57,7 +58,12 @@ const ChatMapPage: React.FC = () => {
             <LayerSelector />
           </div>
         </div>
-        <div className="col-6 p-0">
+        <div
+          className={c("p-0 detail-pane", {
+            "col-6": !detailPaneFullscreen,
+            "col-12": detailPaneFullscreen,
+          })}
+        >
           <FeatureDetailsPanel />
         </div>
       </div>
