@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Maplibre, { Source, Layer, MapRef, MapLayerMouseEvent, StyleSpecification } from 'react-map-gl/maplibre';
-import { layersAtom, SQLLayer, selectedFeaturesAtom, SelectedFeatureInfo } from "./atoms";
+import { layersAtom, SQLLayer, selectedFeaturesAtom, SelectedFeatureInfo, detailPaneVisibleAtom } from "./atoms";
 import { useAtomValue, useSetAtom } from "jotai";
 import MainMapStyle from "./MainMapStyle.json";
 import useSWR from 'swr';
@@ -163,6 +163,7 @@ const MainMap: React.FC = () => {
   const [layerBboxes, setLayerBboxes] = useState<Record<string, BBox | undefined>>({});
   const mapRef = useRef<MapRef>(null);
   const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
+  const setDetailPaneVisible = useSetAtom(detailPaneVisibleAtom);
 
   // Handle bbox updates from individual layers
   const handleBboxChange = useCallback((layerName: string, bbox: BBox | undefined) => {
@@ -214,6 +215,7 @@ const MainMap: React.FC = () => {
 
       // Update the atom with selected features
       setSelectedFeatures(formattedFeatures);
+      setDetailPaneVisible(true);
     } else {
       console.log('No features found at this location');
       // Clear selected features when clicking on empty space

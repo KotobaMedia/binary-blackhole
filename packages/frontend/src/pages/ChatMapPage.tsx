@@ -1,15 +1,25 @@
 import React from "react";
+import c from "classnames";
 import ChatBox from "./ChatMapPage/ChatBox";
 import MainMap from "./ChatMapPage/MainMap";
 import LayerSelector from "./ChatMapPage/LayerSelector";
+import { useAtomValue } from "jotai";
+import { detailPaneFullscreenAtom, detailPaneVisibleAtom } from "./ChatMapPage/atoms";
+// import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
+import "./ChatMapPage/style.css";
 import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
 
 const ChatMapPage: React.FC = () => {
+  const detailPaneVisible = useAtomValue(detailPaneVisibleAtom);
+  const detailPaneFullscreen = useAtomValue(detailPaneFullscreenAtom);
+
   return (
-    <div className="container-fluid vh-100">
-      <div className="row h-100">
-        <ChatBox />
-        <div className="col-5 p-0">
+    <div className="container-fluid overflow-hidden">
+      <div className={c("row vh-100 vw-100 flex-nowrap chat-map-page-container", { "slide-left": detailPaneVisible })}>
+        <div className={c("col-6 p-0 h-100")}>
+          <ChatBox />
+        </div>
+        <div className="col-6 p-0">
           <div className="d-flex flex-column h-100">
             <div className="d-flex flex-wrap px-2 py-1 bg-danger text-center align-items-center justify-content-center">
               <span>
@@ -24,7 +34,7 @@ const ChatMapPage: React.FC = () => {
             <LayerSelector />
           </div>
         </div>
-        <div className="col-3 p-0 h-100 overflow-y-auto overflow-x-hidden">
+        <div className="col-6 p-0">
           <FeatureDetailsPanel />
         </div>
       </div>

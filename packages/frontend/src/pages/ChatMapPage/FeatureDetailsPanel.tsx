@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { useAtomValue } from "jotai";
-import { SelectedFeatureInfo, selectedFeaturesAtom } from "./atoms";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { detailPaneFullscreenAtom, detailPaneVisibleAtom, SelectedFeatureInfo, selectedFeaturesAtom } from "./atoms";
+import { ArrowsCollapseVertical, ArrowsExpandVertical, X } from "react-bootstrap-icons";
 
 // Feature Item component for individual feature display
 const FeatureItem: React.FC<{ item: SelectedFeatureInfo; index: number }> = ({ item }) => (
@@ -48,6 +49,8 @@ const FeatureGroup: React.FC<{ layerName: string; features: SelectedFeatureInfo[
 };
 
 const FeatureDetailsPanel: React.FC = () => {
+  const setVisible = useSetAtom(detailPaneVisibleAtom);
+  const [fullscreen, setFullscreen] = useAtom(detailPaneFullscreenAtom);
   const selectedFeatures = useAtomValue(selectedFeaturesAtom);
 
   if (selectedFeatures.length === 0) {
@@ -69,7 +72,17 @@ const FeatureDetailsPanel: React.FC = () => {
   }, {} as Record<string, typeof selectedFeatures>);
 
   return (
-    <div className="feature-details-panel overflow-auto p-3">
+    <div className="feature-details-panel overflow-auto px-3">
+      <nav className="navbar">
+        <div className="container-fluid">
+          <button className="btn" onClick={() => setFullscreen(x => !x)}>
+            {fullscreen ? <ArrowsCollapseVertical /> : <ArrowsExpandVertical />}
+          </button>
+          <button className="btn" onClick={() => setVisible(false)}>
+            <X />
+          </button>
+        </div>
+      </nav>
       {Object.entries(groupedFeatures).map(([layerName, features]) => (
         <FeatureGroup key={layerName} layerName={layerName} features={features} />
       ))}

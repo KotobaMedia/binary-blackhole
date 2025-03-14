@@ -336,34 +336,34 @@ const ChatBox: React.FC = () => {
   }
 
   return (
-    <div ref={messageContainerRef} className="col-4 d-flex flex-column h-100 overflow-y-auto overflow-x-hidden">
-      <Header />
-      <div
-        className="d-flex flex-column flex-grow-1"
-      >
-        {(isLoading && threadId) && (
-          <div className="text-center p-3">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
+    <div ref={messageContainerRef} className="d-flex flex-column h-100 overflow-y-auto overflow-x-hidden p-3">
+        <Header />
+        <div
+          className="d-flex flex-column flex-grow-1"
+        >
+          {(isLoading && threadId) && (
+            <div className="text-center p-3">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <div className="alert alert-danger m-3" role="alert">
-            Failed to load thread data
-          </div>
-        )}
+          {error && (
+            <div className="alert alert-danger m-3" role="alert">
+              Failed to load thread data
+            </div>
+          )}
 
-        {messages}
+          {messages}
+        </div>
 
         {!threadDetails?.archived && (
-          <div className="position-sticky bottom-0 mt-auto py-3 bg-body bg-opacity-75">
-            <SendMessageBox onSendMessage={handleSendMessage} isLoading={isSending} />
-          </div>
-        )}
+            <div className="position-sticky bottom-0 mt-auto py-3 bg-body bg-opacity-75">
+              <SendMessageBox onSendMessage={handleSendMessage} isLoading={isSending} />
+            </div>
+          )}
       </div>
-    </div>
   );
 }
 

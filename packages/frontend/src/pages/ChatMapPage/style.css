@@ -1,0 +1,7 @@
+.chat-map-page-container {
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.5s ease;
+}
+.chat-map-page-container.slide-left {
+    transform: translate3d(-50%, 0, 0);
+}

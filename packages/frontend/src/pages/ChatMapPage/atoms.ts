@@ -16,3 +16,6 @@ export type SelectedFeatureInfo = {
 
 export const layersAtom = atom<SQLLayer[]>([]);
 export const selectedFeaturesAtom = atom<SelectedFeatureInfo[]>([]);
+
+export const detailPaneVisibleAtom = atom(false);
+export const detailPaneFullscreenAtom = atom(false);
