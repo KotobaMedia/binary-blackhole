@@ -5,7 +5,6 @@ import {
   detailPaneFullscreenAtom,
   detailPaneVisibleAtom,
   layersAtom,
-  SelectedFeatureInfo,
   selectedFeaturesAtom,
   SQLLayer,
 } from "./atoms";
