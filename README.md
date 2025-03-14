@@ -21,6 +21,10 @@ Frontend on [http://localhost:5173](http://localhost:5173) and backend on :9000.
     - `cargo test` assumes DynamoDB Local is running. Start it with `pnpm dev`
 - Backend infrastructure is managed by AWS CDK. See [Deploy docs](./packages/cdk/README.md) for more info.
 
+# Useful commands
+
+- `pnpm update -i --latest -r` update all npm packages recursively
+
 # License
 
 If the AGPL is not appropriate for your use case, a commercial license is available by request. [Contact me if you're interested.](mailto:keita@kotobamedia.com)
