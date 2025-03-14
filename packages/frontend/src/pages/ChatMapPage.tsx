@@ -59,7 +59,7 @@ const ChatMapPage: React.FC = () => {
           </div>
         </div>
         <div
-          className={c("p-0 detail-pane", {
+          className={c("p-0 detail-pane h-100", {
             "col-6": !detailPaneFullscreen,
             "col-12": detailPaneFullscreen,
           })}

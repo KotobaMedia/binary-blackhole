@@ -93,12 +93,15 @@ const FeatureDetailsPanel: React.FC = () => {
   );
 
   return (
-    <div className="feature-details-panel overflow-auto px-3">
+    <div className="feature-details-panel h-100 overflow-auto px-3">
       <nav className="navbar">
         <div className="container-fluid">
           <button className="btn" onClick={() => setFullscreen((x) => !x)}>
             {fullscreen ? <ArrowsCollapseVertical /> : <ArrowsExpandVertical />}
           </button>
+          <div>
+            <h5 className="mb-0">詳細情報</h5>
+          </div>
           <button className="btn" onClick={() => setVisible(false)}>
             <X />
           </button>
