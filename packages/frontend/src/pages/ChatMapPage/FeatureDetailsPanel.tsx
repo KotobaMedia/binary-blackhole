@@ -1,119 +1,190 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import c from "classnames";
 import {
   detailPaneFullscreenAtom,
   detailPaneVisibleAtom,
+  layersAtom,
   SelectedFeatureInfo,
   selectedFeaturesAtom,
+  SQLLayer,
 } from "./atoms";
+import NavDropdown from "react-bootstrap/NavDropdown";
+import BTable from "react-bootstrap/Table";
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 import {
   ArrowsCollapseVertical,
   ArrowsExpandVertical,
   X,
 } from "react-bootstrap-icons";
+import { useQuery } from "../../tools/query";
+import "./table.scss";
 
-// Feature Item component for individual feature display
-const FeatureItem: React.FC<{ item: SelectedFeatureInfo; index: number }> = ({
-  item,
-}) => (
-  <div className="mb-2">
-    <small className="text-muted d-block mb-1">{item.geometryType}</small>
-    <div className="properties">
-      <table className="table table-sm table-striped mb-0 small">
-        <tbody>
-          {Object.entries(item.feature.properties || {}).map(([key, value]) => (
-            <tr key={key}>
-              <td className="fw-bold px-1">{key}</td>
-              <td className="px-1">{String(value)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-// Feature Group component for each layer
-const FeatureGroup: React.FC<{
-  layerName: string;
-  features: SelectedFeatureInfo[];
-}> = ({ layerName, features }) => {
-  const [expanded, setExpanded] = useState(true);
+const LayerTableView: React.FC<{
+  layer: SQLLayer;
+}> = ({ layer }) => {
+  const selectedFeatures = useAtomValue(selectedFeaturesAtom).filter(
+    (feature) => feature.layerName === layer.name,
+  );
+  console.log("selectedFeatures", selectedFeatures);
+  const { data: resp } = useQuery(layer.sql);
+  const [data, columns] = useMemo(() => {
+    if (!resp || resp.data.features.length === 0) {
+      return [[], []];
+    }
+    const features = resp.data.features;
+    const columnHelper = createColumnHelper<GeoJSON.Feature>();
+    const columns = Object.keys(features[0].properties!)
+      .filter((key) => {
+        if (key.startsWith("_")) {
+          return false;
+        }
+        return true;
+      })
+      .map((key) =>
+        columnHelper.accessor((row) => (row.properties || {})[key], {
+          id: key,
+        }),
+      );
+    return [features, columns];
+  }, [resp]);
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    columnResizeMode: "onChange",
+    getRowId: (row, idx) => (row.id ?? idx).toString(),
+    enableRowSelection: true,
+    enableMultiRowSelection: false,
+  });
+  // useEffect(() => {
+  //   table.setRowSelection(
+  //     Object.fromEntries(
+  //       selectedFeatures
+  //         .map((feature) => feature?.feature?.id?.toString())
+  //         .filter(Boolean)
+  //         .map((id) => [id, true] as const),
+  //     ),
+  //   );
+  // }, [table, selectedFeatures]);
 
   return (
-    <div className="mb-3 p-1">
-      <div
-        className="d-flex justify-content-between align-items-center cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
-        style={{ cursor: "pointer" }}
-      >
-        <h5 className="mb-0">
-          {layerName} ({features.length})
-        </h5>
-        <span>{expanded ? "▼" : "◀︎"}</span>
-      </div>
-
-      {expanded && (
-        <div className="mt-2">
-          {features.map((item, index) => (
-            <FeatureItem key={index} item={item} index={index} />
-          ))}
-        </div>
-      )}
-    </div>
+    <BTable striped bordered hover responsive size="sm" className="data-table">
+      <thead className="position-sticky top-0">
+        {table.getHeaderGroups().map((headerGroup) => (
+          <tr key={headerGroup.id}>
+            {headerGroup.headers.map((header) => (
+              <th
+                key={header.id}
+                colSpan={header.colSpan}
+                style={{ width: header.getSize(), position: "relative" }}
+              >
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
+                <div
+                  onDoubleClick={() => header.column.resetSize()}
+                  onMouseDown={header.getResizeHandler()}
+                  onTouchStart={header.getResizeHandler()}
+                  className={c(`resizer ltr`, {
+                    isResizing: header.column.getIsResizing(),
+                  })}
+                />
+              </th>
+            ))}
+          </tr>
+        ))}
+      </thead>
+      <tbody>
+        {table.getRowModel().rows.map((row) => (
+          <tr key={row.id} className={c({ selected: row.getIsSelected() })}>
+            {row.getVisibleCells().map((cell) => (
+              <td key={cell.id}>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+      <tfoot>
+        {table.getFooterGroups().map((footerGroup) => (
+          <tr key={footerGroup.id}>
+            {footerGroup.headers.map((header) => (
+              <th key={header.id} colSpan={header.colSpan}>
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(
+                      header.column.columnDef.footer,
+                      header.getContext(),
+                    )}
+              </th>
+            ))}
+          </tr>
+        ))}
+      </tfoot>
+    </BTable>
   );
 };
 
 const FeatureDetailsPanel: React.FC = () => {
   const setVisible = useSetAtom(detailPaneVisibleAtom);
   const [fullscreen, setFullscreen] = useAtom(detailPaneFullscreenAtom);
-  const selectedFeatures = useAtomValue(selectedFeaturesAtom);
 
-  if (selectedFeatures.length === 0) {
-    return (
-      <div className="feature-details-panel p-3 border-top">
-        <p className="text-muted">
-          地物は選択されていません。クエリー実行後に地物をクリックすると詳細をここで確認できます。
-        </p>
-      </div>
-    );
-  }
-
-  // Group features by layerName
-  const groupedFeatures = selectedFeatures.reduce(
-    (acc, feature) => {
-      const { layerName } = feature;
-      if (!acc[layerName]) {
-        acc[layerName] = [];
-      }
-      acc[layerName].push(feature);
-      return acc;
-    },
-    {} as Record<string, typeof selectedFeatures>,
+  const [selectedLayer, setSelectedLayer] = useState<SQLLayer | undefined>(
+    undefined,
   );
+  const layers = useAtomValue(layersAtom).filter((layer) => layer.enabled);
+
+  useEffect(() => {
+    setSelectedLayer((x) => {
+      if (x) {
+        return x;
+      }
+      return layers.length > 0 ? layers[0] : undefined;
+    });
+  }, [layers]);
 
   return (
     <div className="feature-details-panel h-100 overflow-auto px-3">
-      <nav className="navbar">
+      <nav className="navbar position-sticky top-0 bg-body bg-opacity-75">
         <div className="container-fluid">
           <button className="btn" onClick={() => setFullscreen((x) => !x)}>
             {fullscreen ? <ArrowsCollapseVertical /> : <ArrowsExpandVertical />}
           </button>
           <div>
-            <h5 className="mb-0">詳細情報</h5>
+            <NavDropdown title={selectedLayer?.name} id="layer-dropdown">
+              {layers.map((layer) => (
+                <NavDropdown.Item
+                  key={layer.name}
+                  onClick={() => setSelectedLayer(layer)}
+                  active={layer.name === selectedLayer?.name}
+                >
+                  {layer.name}
+                </NavDropdown.Item>
+              ))}
+            </NavDropdown>
           </div>
-          <button className="btn" onClick={() => setVisible(false)}>
+          <button
+            className="btn"
+            onClick={() => {
+              setVisible(false);
+              setFullscreen(false);
+            }}
+          >
             <X />
           </button>
         </div>
       </nav>
-      {Object.entries(groupedFeatures).map(([layerName, features]) => (
-        <FeatureGroup
-          key={layerName}
-          layerName={layerName}
-          features={features}
-        />
-      ))}
+
+      {selectedLayer && <LayerTableView layer={selectedLayer} />}
     </div>
   );
 };

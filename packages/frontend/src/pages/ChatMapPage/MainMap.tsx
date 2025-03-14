@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Maplibre, {
   Source,
   Layer,
@@ -15,34 +21,8 @@ import {
 } from "./atoms";
 import { useAtomValue, useSetAtom } from "jotai";
 import MainMapStyle from "./MainMapStyle.json";
-import useSWR from "swr";
 import chroma from "chroma-js";
-
-type QueryResponse = {
-  data: GeoJSON.FeatureCollection;
-  bbox?: BBox;
-};
-
-// Type for bounding box
-type BBox = [number, number, number, number]; // [west, south, east, north]
-
-const queryFetcher = async (sql: string) => {
-  const apiUrl = import.meta.env.VITE_API_URL;
-  const response = await fetch(`${apiUrl}/query`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query: sql }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! Status: ${response.status}`);
-  }
-
-  const result = await response.json();
-  return result as QueryResponse;
-};
+import { BBox, useQuery } from "../../tools/query";
 
 // Function to generate a deterministic color based on layer name
 const getLayerColor = (layerName: string) => {
@@ -81,11 +61,7 @@ const MapLayer: React.FC<{
   layer: SQLLayer;
   onBboxChange: (name: string, bbox: BBox | undefined) => void;
 }> = ({ layer, onBboxChange }) => {
-  const { data: resp, error } = useSWR(
-    layer.sql ? layer.sql : null,
-    queryFetcher,
-    { revalidateOnFocus: false },
-  );
+  const { data: resp, error } = useQuery(layer.sql);
   const setLayers = useSetAtom(layersAtom);
 
   useEffect(() => {
@@ -113,17 +89,32 @@ const MapLayer: React.FC<{
     }
   }, [resp?.data, error, layer.name, setLayers]);
 
+  const featureCollection = useMemo<GeoJSON.FeatureCollection | null>(() => {
+    const data = resp?.data;
+    if (!data) return null;
+    return {
+      type: "FeatureCollection",
+      features: data.features.map((feature, idx) => ({
+        id: feature.id ?? feature.properties?._id ?? idx,
+        ...feature,
+        properties: {
+          ...feature.properties,
+        },
+      })),
+    };
+  }, [resp?.data]);
+
   if (error) {
     console.error(`Error loading layer ${layer.name}:`, error);
     return null;
   }
-  if (!resp) return null;
+  if (!resp || !featureCollection) return null;
 
   const sourceId = `source-${layer.name}`;
   const layerColor = getLayerColor(layer.name);
 
   return (
-    <Source id={sourceId} type="geojson" data={resp.data}>
+    <Source id={sourceId} type="geojson" data={featureCollection}>
       {/* Point layer */}
       <Layer
         id={`${layer.name}/point`}
