@@ -1,15 +1,27 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Maplibre, { Source, Layer, MapRef, MapLayerMouseEvent, StyleSpecification } from 'react-map-gl/maplibre';
-import { layersAtom, SQLLayer, selectedFeaturesAtom, SelectedFeatureInfo, detailPaneVisibleAtom } from "./atoms";
+import Maplibre, {
+  Source,
+  Layer,
+  MapRef,
+  MapLayerMouseEvent,
+  StyleSpecification,
+} from "react-map-gl/maplibre";
+import {
+  layersAtom,
+  SQLLayer,
+  selectedFeaturesAtom,
+  SelectedFeatureInfo,
+  detailPaneVisibleAtom,
+} from "./atoms";
 import { useAtomValue, useSetAtom } from "jotai";
 import MainMapStyle from "./MainMapStyle.json";
-import useSWR from 'swr';
-import chroma from 'chroma-js';
+import useSWR from "swr";
+import chroma from "chroma-js";
 
 type QueryResponse = {
   data: GeoJSON.FeatureCollection;
   bbox?: BBox;
-}
+};
 
 // Type for bounding box
 type BBox = [number, number, number, number]; // [west, south, east, north]
@@ -17,9 +29,9 @@ type BBox = [number, number, number, number]; // [west, south, east, north]
 const queryFetcher = async (sql: string) => {
   const apiUrl = import.meta.env.VITE_API_URL;
   const response = await fetch(`${apiUrl}/query`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ query: sql }),
   });
@@ -51,22 +63,28 @@ const getLayerColor = (layerName: string) => {
 const mergeBboxes = (bboxes: BBox[]): BBox | undefined => {
   if (bboxes.length === 0) return undefined;
 
-  return bboxes.reduce((merged, current) => {
-    if (!merged) return current;
-    return [
-      Math.min(merged[0], current[0]), // min west
-      Math.min(merged[1], current[1]), // min south
-      Math.max(merged[2], current[2]), // max east
-      Math.max(merged[3], current[3]), // max north
-    ] as BBox;
-  }, undefined as BBox | undefined);
+  return bboxes.reduce(
+    (merged, current) => {
+      if (!merged) return current;
+      return [
+        Math.min(merged[0], current[0]), // min west
+        Math.min(merged[1], current[1]), // min south
+        Math.max(merged[2], current[2]), // max east
+        Math.max(merged[3], current[3]), // max north
+      ] as BBox;
+    },
+    undefined as BBox | undefined,
+  );
 };
 
-const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BBox | undefined) => void}> = ({layer, onBboxChange}) => {
+const MapLayer: React.FC<{
+  layer: SQLLayer;
+  onBboxChange: (name: string, bbox: BBox | undefined) => void;
+}> = ({ layer, onBboxChange }) => {
   const { data: resp, error } = useSWR(
     layer.sql ? layer.sql : null,
     queryFetcher,
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: false },
   );
   const setLayers = useSetAtom(layersAtom);
 
@@ -77,15 +95,19 @@ const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BB
 
   useEffect(() => {
     if (error) {
-      setLayers(prev =>
-        prev.map(l => (l.name === layer.name ? { ...l, error: error.message } : l))
+      setLayers((prev) =>
+        prev.map((l) =>
+          l.name === layer.name ? { ...l, error: error.message } : l,
+        ),
       );
     }
     if (resp?.data) {
       let count = resp?.data.features.length;
       if (count === 0) {
-        setLayers(prev =>
-          prev.map(l => (l.name === layer.name ? { ...l, error: "No features found" } : l))
+        setLayers((prev) =>
+          prev.map((l) =>
+            l.name === layer.name ? { ...l, error: "No features found" } : l,
+          ),
         );
       }
     }
@@ -107,13 +129,13 @@ const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BB
         id={`${layer.name}/point`}
         source={sourceId}
         type="circle"
-        filter={['==', ['geometry-type'], 'Point']}
+        filter={["==", ["geometry-type"], "Point"]}
         paint={{
-          'circle-radius': 5,
-          'circle-color': layerColor,
-          'circle-opacity': 0.8,
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#fff'
+          "circle-radius": 5,
+          "circle-color": layerColor,
+          "circle-opacity": 0.8,
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#fff",
         }}
       />
 
@@ -122,11 +144,11 @@ const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BB
         id={`${layer.name}/line`}
         source={sourceId}
         type="line"
-        filter={['==', ['geometry-type'], 'LineString']}
+        filter={["==", ["geometry-type"], "LineString"]}
         paint={{
-          'line-color': layerColor,
-          'line-width': 2,
-          'line-opacity': 0.8
+          "line-color": layerColor,
+          "line-width": 2,
+          "line-opacity": 0.8,
         }}
       />
 
@@ -135,10 +157,10 @@ const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BB
         id={`${layer.name}/polygon-fill`}
         source={sourceId}
         type="fill"
-        filter={['==', ['geometry-type'], 'Polygon']}
+        filter={["==", ["geometry-type"], "Polygon"]}
         paint={{
-          'fill-color': layerColor,
-          'fill-opacity': 0.4
+          "fill-color": layerColor,
+          "fill-opacity": 0.4,
         }}
       />
 
@@ -147,11 +169,11 @@ const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BB
         id={`${layer.name}/polygon-outline`}
         source={sourceId}
         type="line"
-        filter={['==', ['geometry-type'], 'Polygon']}
+        filter={["==", ["geometry-type"], "Polygon"]}
         paint={{
-          'line-color': layerColor,
-          'line-width': 1,
-          'line-opacity': 0.8
+          "line-color": layerColor,
+          "line-width": 1,
+          "line-opacity": 0.8,
         }}
       />
     </Source>
@@ -159,74 +181,86 @@ const MapLayer: React.FC<{layer: SQLLayer, onBboxChange: (name: string, bbox: BB
 };
 
 const MainMap: React.FC = () => {
-  const layers = useAtomValue(layersAtom).filter(layer => layer.enabled);
-  const [layerBboxes, setLayerBboxes] = useState<Record<string, BBox | undefined>>({});
+  const layers = useAtomValue(layersAtom).filter((layer) => layer.enabled);
+  const [layerBboxes, setLayerBboxes] = useState<
+    Record<string, BBox | undefined>
+  >({});
   const mapRef = useRef<MapRef>(null);
   const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
   const setDetailPaneVisible = useSetAtom(detailPaneVisibleAtom);
 
   // Handle bbox updates from individual layers
-  const handleBboxChange = useCallback((layerName: string, bbox: BBox | undefined) => {
-    setLayerBboxes(prev => ({
-      ...prev,
-      [layerName]: bbox
-    }));
-  }, []);
+  const handleBboxChange = useCallback(
+    (layerName: string, bbox: BBox | undefined) => {
+      setLayerBboxes((prev) => ({
+        ...prev,
+        [layerName]: bbox,
+      }));
+    },
+    [],
+  );
 
   // Handle click on map features
-  const handleMapClick = useCallback((event: MapLayerMouseEvent) => {
-    if (!mapRef.current) return;
+  const handleMapClick = useCallback(
+    (event: MapLayerMouseEvent) => {
+      if (!mapRef.current) return;
 
-    const map = mapRef.current.getMap();
-    // Get all visible layers that we've added
-    const visibleLayers = layers.map(layer => [
-      `${layer.name}/point`,
-      `${layer.name}/line`,
-      `${layer.name}/polygon-fill`,
-      `${layer.name}/polygon-outline`
-    ]).flat();
+      const map = mapRef.current.getMap();
+      // Get all visible layers that we've added
+      const visibleLayers = layers
+        .map((layer) => [
+          `${layer.name}/point`,
+          `${layer.name}/line`,
+          `${layer.name}/polygon-fill`,
+          `${layer.name}/polygon-outline`,
+        ])
+        .flat();
 
-    // Query features at the clicked point
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: visibleLayers
-    });
-
-    if (features.length > 0) {
-      console.log('Clicked features:', features);
-
-      // Format feature information and store in the atom
-      const formattedFeatures: SelectedFeatureInfo[] = features.map(feature => {
-        const layerId = feature.layer.id;
-        const layerName = layerId.split('/')[0];
-        const geometryType = layerId.split('/')[1];
-
-        // Log for debugging
-        console.log(`Feature from layer: ${layerName} (${geometryType})`);
-        console.log('Properties:', feature.properties);
-        console.log('Geometry type:', feature.geometry.type);
-        console.log('-------------------');
-
-        return {
-          feature,
-          layerName,
-          geometryType
-        };
+      // Query features at the clicked point
+      const features = map.queryRenderedFeatures(event.point, {
+        layers: visibleLayers,
       });
 
-      // Update the atom with selected features
-      setSelectedFeatures(formattedFeatures);
-      setDetailPaneVisible(true);
-    } else {
-      console.log('No features found at this location');
-      // Clear selected features when clicking on empty space
-      setSelectedFeatures([]);
-    }
-  }, [layers, setSelectedFeatures]);
+      if (features.length > 0) {
+        console.log("Clicked features:", features);
+
+        // Format feature information and store in the atom
+        const formattedFeatures: SelectedFeatureInfo[] = features.map(
+          (feature) => {
+            const layerId = feature.layer.id;
+            const layerName = layerId.split("/")[0];
+            const geometryType = layerId.split("/")[1];
+
+            // Log for debugging
+            console.log(`Feature from layer: ${layerName} (${geometryType})`);
+            console.log("Properties:", feature.properties);
+            console.log("Geometry type:", feature.geometry.type);
+            console.log("-------------------");
+
+            return {
+              feature,
+              layerName,
+              geometryType,
+            };
+          },
+        );
+
+        // Update the atom with selected features
+        setSelectedFeatures(formattedFeatures);
+        setDetailPaneVisible(true);
+      } else {
+        console.log("No features found at this location");
+        // Clear selected features when clicking on empty space
+        setSelectedFeatures([]);
+      }
+    },
+    [layers, setSelectedFeatures],
+  );
 
   // Calculate merged bbox and fit map when bboxes change
   useEffect(() => {
     const bboxes = Object.values(layerBboxes).filter(
-      (bbox): bbox is BBox => !!bbox
+      (bbox): bbox is BBox => !!bbox,
     );
 
     if (bboxes.length > 0 && mapRef.current) {
@@ -234,8 +268,11 @@ const MainMap: React.FC = () => {
       if (mergedBbox) {
         // Add padding to the bbox
         mapRef.current.fitBounds(
-          [[mergedBbox[0], mergedBbox[1]], [mergedBbox[2], mergedBbox[3]]],
-          { padding: 50, duration: 1000 }
+          [
+            [mergedBbox[0], mergedBbox[1]],
+            [mergedBbox[2], mergedBbox[3]],
+          ],
+          { padding: 50, duration: 1000 },
         );
       }
     }
@@ -252,7 +289,7 @@ const MainMap: React.FC = () => {
       }}
       onClick={handleMapClick}
     >
-      {layers.map(layer => (
+      {layers.map((layer) => (
         <MapLayer
           key={layer.name}
           layer={layer}
@@ -261,6 +298,6 @@ const MainMap: React.FC = () => {
       ))}
     </Maplibre>
   );
-}
+};
 
 export default MainMap;

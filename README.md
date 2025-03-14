@@ -4,8 +4,8 @@
 
 # Prerequsites
 
-* Install the Node version specified in `mise.toml` (or just use Mise)
-* Install [cargo-lambda](https://www.cargo-lambda.info/guide/installation.html)
+- Install the Node version specified in `mise.toml` (or just use Mise)
+- Install [cargo-lambda](https://www.cargo-lambda.info/guide/installation.html)
 
 # Local Dev
 
@@ -16,10 +16,10 @@ Frontend on [http://localhost:5173](http://localhost:5173) and backend on :9000.
 
 # Info
 
-* TypeScript packages live in `packages/*`. `pnpm` workspaces are utilized. Use `corepack prepare --activate` to get started.
-* Rust crates live in `crates/*`. Add new crates with `cargo new crates/<name> --(bin|lib)`.
-    * `cargo test` assumes DynamoDB Local is running. Start it with `pnpm dev`
-* Backend infrastructure is managed by AWS CDK. See [Deploy docs](./packages/cdk/README.md) for more info.
+- TypeScript packages live in `packages/*`. `pnpm` workspaces are utilized. Use `corepack prepare --activate` to get started.
+- Rust crates live in `crates/*`. Add new crates with `cargo new crates/<name> --(bin|lib)`.
+    - `cargo test` assumes DynamoDB Local is running. Start it with `pnpm dev`
+- Backend infrastructure is managed by AWS CDK. See [Deploy docs](./packages/cdk/README.md) for more info.
 
 # License
 

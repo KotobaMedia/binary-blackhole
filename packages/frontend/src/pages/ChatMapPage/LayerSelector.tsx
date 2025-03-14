@@ -6,21 +6,26 @@ import { ExclamationTriangleFill } from "react-bootstrap-icons";
 const LayerSelector: React.FC = () => {
   const [layers, setLayers] = useAtom(layersAtom);
 
-  const toggleLayer = useCallback((layerName: string) => {
-    setLayers(prev => prev.map(layer => {
-      if (layer.name === layerName) {
-        return { ...layer, enabled: !layer.enabled };
-      }
-      return layer;
-    }));
-  }, [setLayers]);
+  const toggleLayer = useCallback(
+    (layerName: string) => {
+      setLayers((prev) =>
+        prev.map((layer) => {
+          if (layer.name === layerName) {
+            return { ...layer, enabled: !layer.enabled };
+          }
+          return layer;
+        }),
+      );
+    },
+    [setLayers],
+  );
 
   return (
     <div className="d-flex flex-wrap gap-2 p-2">
       {layers.map((layer) => (
         <button
           key={layer.name}
-          className={`btn btn-sm py-0 ${layer.enabled ? 'btn-primary' : 'btn-outline-secondary'}`}
+          className={`btn btn-sm py-0 ${layer.enabled ? "btn-primary" : "btn-outline-secondary"}`}
           onClick={() => toggleLayer(layer.name)}
           type="button"
         >
@@ -30,6 +35,6 @@ const LayerSelector: React.FC = () => {
       ))}
     </div>
   );
-}
+};
 
 export default LayerSelector;

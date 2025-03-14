@@ -14,6 +14,6 @@ const App: React.FC = () => {
       </Route>
     </Switch>
   );
-}
+};
 
 export default App;

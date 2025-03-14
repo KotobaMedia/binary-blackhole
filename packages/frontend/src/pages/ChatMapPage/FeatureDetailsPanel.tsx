@@ -1,10 +1,21 @@
 import React, { useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { detailPaneFullscreenAtom, detailPaneVisibleAtom, SelectedFeatureInfo, selectedFeaturesAtom } from "./atoms";
-import { ArrowsCollapseVertical, ArrowsExpandVertical, X } from "react-bootstrap-icons";
+import {
+  detailPaneFullscreenAtom,
+  detailPaneVisibleAtom,
+  SelectedFeatureInfo,
+  selectedFeaturesAtom,
+} from "./atoms";
+import {
+  ArrowsCollapseVertical,
+  ArrowsExpandVertical,
+  X,
+} from "react-bootstrap-icons";
 
 // Feature Item component for individual feature display
-const FeatureItem: React.FC<{ item: SelectedFeatureInfo; index: number }> = ({ item }) => (
+const FeatureItem: React.FC<{ item: SelectedFeatureInfo; index: number }> = ({
+  item,
+}) => (
   <div className="mb-2">
     <small className="text-muted d-block mb-1">{item.geometryType}</small>
     <div className="properties">
@@ -23,7 +34,10 @@ const FeatureItem: React.FC<{ item: SelectedFeatureInfo; index: number }> = ({ i
 );
 
 // Feature Group component for each layer
-const FeatureGroup: React.FC<{ layerName: string; features: SelectedFeatureInfo[] }> = ({ layerName, features }) => {
+const FeatureGroup: React.FC<{
+  layerName: string;
+  features: SelectedFeatureInfo[];
+}> = ({ layerName, features }) => {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -33,7 +47,9 @@ const FeatureGroup: React.FC<{ layerName: string; features: SelectedFeatureInfo[
         onClick={() => setExpanded(!expanded)}
         style={{ cursor: "pointer" }}
       >
-        <h5 className="mb-0">{layerName} ({features.length})</h5>
+        <h5 className="mb-0">
+          {layerName} ({features.length})
+        </h5>
         <span>{expanded ? "▼" : "◀︎"}</span>
       </div>
 
@@ -56,26 +72,31 @@ const FeatureDetailsPanel: React.FC = () => {
   if (selectedFeatures.length === 0) {
     return (
       <div className="feature-details-panel p-3 border-top">
-        <p className="text-muted">地物は選択されていません。クエリー実行後に地物をクリックすると詳細をここで確認できます。</p>
+        <p className="text-muted">
+          地物は選択されていません。クエリー実行後に地物をクリックすると詳細をここで確認できます。
+        </p>
       </div>
     );
   }
 
   // Group features by layerName
-  const groupedFeatures = selectedFeatures.reduce((acc, feature) => {
-    const { layerName } = feature;
-    if (!acc[layerName]) {
-      acc[layerName] = [];
-    }
-    acc[layerName].push(feature);
-    return acc;
-  }, {} as Record<string, typeof selectedFeatures>);
+  const groupedFeatures = selectedFeatures.reduce(
+    (acc, feature) => {
+      const { layerName } = feature;
+      if (!acc[layerName]) {
+        acc[layerName] = [];
+      }
+      acc[layerName].push(feature);
+      return acc;
+    },
+    {} as Record<string, typeof selectedFeatures>,
+  );
 
   return (
     <div className="feature-details-panel overflow-auto px-3">
       <nav className="navbar">
         <div className="container-fluid">
-          <button className="btn" onClick={() => setFullscreen(x => !x)}>
+          <button className="btn" onClick={() => setFullscreen((x) => !x)}>
             {fullscreen ? <ArrowsCollapseVertical /> : <ArrowsExpandVertical />}
           </button>
           <button className="btn" onClick={() => setVisible(false)}>
@@ -84,7 +105,11 @@ const FeatureDetailsPanel: React.FC = () => {
         </div>
       </nav>
       {Object.entries(groupedFeatures).map(([layerName, features]) => (
-        <FeatureGroup key={layerName} layerName={layerName} features={features} />
+        <FeatureGroup
+          key={layerName}
+          layerName={layerName}
+          features={features}
+        />
       ))}
     </div>
   );

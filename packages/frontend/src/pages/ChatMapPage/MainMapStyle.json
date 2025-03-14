@@ -3,22 +3,22 @@
     "maxzoom": 18,
     "minzoom": 5,
     "sources": {
-      "gsi-pale": {
-        "type": "raster",
-        "tiles": [
-          "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"
-        ],
-        "tileSize": 256,
-        "attribution": "© 国土地理院",
-        "maxzoom": 18,
-        "minzoom": 5
-      }
+        "gsi-pale": {
+            "type": "raster",
+            "tiles": [
+                "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"
+            ],
+            "tileSize": 256,
+            "attribution": "© 国土地理院",
+            "maxzoom": 18,
+            "minzoom": 5
+        }
     },
     "layers": [
-      {
-        "id": "gsi-pale-layer",
-        "type": "raster",
-        "source": "gsi-pale"
-      }
+        {
+            "id": "gsi-pale-layer",
+            "type": "raster",
+            "source": "gsi-pale"
+        }
     ]
-  }
+}

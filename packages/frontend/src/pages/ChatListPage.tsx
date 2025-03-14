@@ -18,6 +18,6 @@ const ChatListPage: React.FC = () => {
       </ul>
     </AppLayout>
   );
-}
+};
 
 export default ChatListPage;

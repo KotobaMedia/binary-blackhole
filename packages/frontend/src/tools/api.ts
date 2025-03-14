@@ -2,19 +2,23 @@
 export const fetcher = async (url: string) => {
   const apiUrl = import.meta.env.VITE_API_URL;
   if (!apiUrl) {
-    throw new Error('API URL is not defined');
+    throw new Error("API URL is not defined");
   }
   const res = await fetch(`${apiUrl}${url}`);
   if (!res.ok) {
-    throw new Error('API request failed');
+    throw new Error("API request failed");
   }
   return res.json();
 };
 
-export async function* streamJsonLines<T>(url: string, init?: RequestInit): AsyncIterableIterator<T> {
-  const apiUrl = import.meta.env.VITE_STREAMING_API_URL || import.meta.env.VITE_API_URL;
+export async function* streamJsonLines<T>(
+  url: string,
+  init?: RequestInit,
+): AsyncIterableIterator<T> {
+  const apiUrl =
+    import.meta.env.VITE_STREAMING_API_URL || import.meta.env.VITE_API_URL;
   if (!apiUrl) {
-    throw new Error('API URL is not defined');
+    throw new Error("API URL is not defined");
   }
   const response = await fetch(`${apiUrl}${url}`, init);
 

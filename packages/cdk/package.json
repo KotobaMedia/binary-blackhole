@@ -1,28 +1,28 @@
 {
-  "name": "@kotobamedia/binary-blackhole-cdk",
-  "version": "0.1.0",
-  "bin": {
-    "cdk": "bin/cdk.js"
-  },
-  "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
-    "test": "jest",
-    "cdk": "cdk",
-    "deploy:dev": "cdk deploy \"Dev/*\" --profile bbh-dev"
-  },
-  "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "@types/node": "22.13.10",
-    "aws-cdk": "2.1003.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.2.6",
-    "ts-node": "^10.9.2",
-    "typescript": "~5.8.2"
-  },
-  "dependencies": {
-    "aws-cdk-lib": "2.182.0",
-    "cargo-lambda-cdk": "^0.0.32",
-    "constructs": "^10.4.2"
-  }
+    "name": "@kotobamedia/binary-blackhole-cdk",
+    "version": "0.1.0",
+    "bin": {
+        "cdk": "bin/cdk.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc -w",
+        "test": "jest",
+        "cdk": "cdk",
+        "deploy:dev": "cdk deploy \"Dev/*\" --profile bbh-dev"
+    },
+    "devDependencies": {
+        "@types/jest": "^29.5.14",
+        "@types/node": "22.13.10",
+        "aws-cdk": "2.1003.0",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.2.6",
+        "ts-node": "^10.9.2",
+        "typescript": "~5.8.2"
+    },
+    "dependencies": {
+        "aws-cdk-lib": "2.183.0",
+        "cargo-lambda-cdk": "^0.0.32",
+        "constructs": "^10.4.2"
+    }
 }

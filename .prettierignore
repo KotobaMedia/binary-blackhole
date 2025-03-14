@@ -1,0 +1,14 @@
+# Rust code -- rustfmt will take care of that
+crates
+
+# JS stuff
+dist
+build
+coverage
+node_modules
+
+# CDK
+cdk.out
+
+# generated files
+pnpm-lock.yaml
