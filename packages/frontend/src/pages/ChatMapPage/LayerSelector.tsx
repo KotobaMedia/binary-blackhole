@@ -1,10 +1,11 @@
-import { useAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import React, { useCallback } from "react";
-import { layersAtom } from "./atoms";
+import { layersAtom, mergedLayersAtom } from "./atoms";
 import { ExclamationTriangleFill } from "react-bootstrap-icons";
 
 const LayerSelector: React.FC = () => {
-  const [layers, setLayers] = useAtom(layersAtom);
+  const layers = useAtomValue(mergedLayersAtom);
+  const setLayers = useSetAtom(layersAtom);
 
   const toggleLayer = useCallback(
     (layerName: string) => {

@@ -72,3 +72,11 @@ pub struct ThreadDetails {
     pub archived: Option<bool>,
     pub messages: Vec<MessageView>,
 }
+
+#[derive(Serialize)]
+pub struct ThreadDetailsFull {
+    pub id: String,
+    pub title: String,
+    pub archived: Option<bool>,
+    pub messages: Vec<ChatterMessage>,
+}

@@ -1,3 +1,4 @@
+use crate::data::threads::ThreadDetailsFull;
 use crate::state::AppState;
 use crate::{
     data::threads::{MessageView, Thread, ThreadDetails, ThreadList},
@@ -40,9 +41,26 @@ async fn get_thread_handler(
             .map(Into::into)
             .filter(|m: &MessageView| {
                 m.content.role != chatter::chatter_message::Role::System
-                    && (!m.content.sidecar.is_none() || !m.content.message.is_none())
+                // && (!m.content.sidecar.is_none() || !m.content.message.is_none())
             })
             .collect(),
+    }
+    .into())
+}
+
+async fn get_thread_full_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<ThreadDetailsFull>> {
+    let thread_f = ChatThread::get_thread(&state.db, "demo_user", &id);
+    let messages_f = ChatMessage::get_all_thread_messages(&state.db, "demo_user", &id);
+    let (thread, messages) = tokio::try_join!(thread_f, messages_f)?;
+
+    Ok(ThreadDetailsFull {
+        id: thread.id().to_string(),
+        title: thread.title,
+        archived: thread.archived,
+        messages: messages.into_iter().map(|m| m.msg).collect(),
     }
     .into())
 }
@@ -91,5 +109,6 @@ pub fn threads_routes() -> Router<AppState> {
         .route("/threads", get(get_threads_handler))
         .route("/threads", post(create_new_thread_handler))
         .route("/threads/{id}", get(get_thread_handler))
+        .route("/threads/{id}/_full", get(get_thread_full_handler))
         .route("/threads/{id}/archive", post(archive_thread_handler))
 }

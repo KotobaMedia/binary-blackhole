@@ -192,7 +192,7 @@ impl ExecutionContext {
                     .map(|row| row.get::<_, String>(0))
                     .collect::<Vec<_>>()
                     .join("\n");
-                let message = format!("Query plan:\n{}", plan);
+                let message = format!("Query plan:\n```\n{}\n```", plan);
                 println!("SQL [{}]: {}", params.name, &query);
                 return Ok(ChatterMessage {
                     message: Some(message),
@@ -203,7 +203,22 @@ impl ExecutionContext {
                 });
             }
             Err(e) => {
-                let message = format!("Failed to execute query: {}", e);
+                let message = if let Some(db_error) = e.as_db_error() {
+                    format!(
+                        "Failed to execute query: {}{}{}",
+                        db_error.message(),
+                        db_error
+                            .where_()
+                            .map(|where_| format!(", where: {}", where_))
+                            .unwrap_or_default(),
+                        db_error
+                            .hint()
+                            .map(|hint| format!(", hint: {}", hint))
+                            .unwrap_or_default()
+                    )
+                } else {
+                    format!("Failed to execute query: {}", e)
+                };
                 return Ok(ChatterMessage {
                     message: Some(message),
                     role: Role::Tool,

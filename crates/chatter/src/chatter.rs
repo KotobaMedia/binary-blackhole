@@ -252,9 +252,10 @@ fn convert_column_value(
         // If the column is already in JSON format.
         "json" | "jsonb" => row.get(index),
         // Fallback: attempt to get a string representation.
-        _ => {
+        _col_type_name => {
             // Using try_get to avoid panics if conversion fails.
             let s: Option<String> = row.try_get(index).ok();
+            // println!("Unknown type: {} {:?}", _col_type_name, s);
             s.map(serde_json::Value::String)
                 .unwrap_or(serde_json::Value::Null)
         }

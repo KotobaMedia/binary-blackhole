@@ -14,7 +14,24 @@ export type SelectedFeatureInfo = {
   geometryType: string;
 };
 
+/// All layers, including previous versions.
 export const layersAtom = atom<SQLLayer[]>([]);
+
+/// This is the list of layers with previous versions removed.
+export const mergedLayersAtom = atom<SQLLayer[]>((get) => {
+  let allLayers = get(layersAtom);
+  const dedupedLayers = allLayers.reduce((acc: SQLLayer[], layer: SQLLayer) => {
+    const existingLayerIdx = acc.findIndex((l) => l.name === layer.name);
+    if (existingLayerIdx >= 0) {
+      // replace the existing layer with the new one
+      acc.splice(existingLayerIdx, 1, layer);
+    } else {
+      acc.push(layer);
+    }
+    return acc;
+  }, []);
+  return dedupedLayers;
+});
 export const selectedFeaturesAtom = atom<SelectedFeatureInfo[]>([]);
 
 export const detailPaneVisibleAtom = atom(false);

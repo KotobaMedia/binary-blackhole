@@ -18,6 +18,7 @@ import {
   selectedFeaturesAtom,
   SelectedFeatureInfo,
   detailPaneVisibleAtom,
+  mergedLayersAtom,
 } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import MainMapStyle from "./MainMapStyle.json";
@@ -229,7 +230,7 @@ const MapLayer: React.FC<{
 };
 
 const MainMap: React.FC = () => {
-  const layers = useAtomValue(layersAtom).filter(
+  const layers = useAtomValue(mergedLayersAtom).filter(
     (layer) => layer.enabled && !layer.error,
   );
   const [layerBboxes, setLayerBboxes] = useState<

@@ -4,7 +4,7 @@ import c from "classnames";
 import {
   detailPaneFullscreenAtom,
   detailPaneVisibleAtom,
-  layersAtom,
+  mergedLayersAtom,
   // selectedFeaturesAtom,
   SQLLayer,
 } from "./atoms";
@@ -140,7 +140,9 @@ const FeatureDetailsPanel: React.FC = () => {
   const [selectedLayer, setSelectedLayer] = useState<SQLLayer | undefined>(
     undefined,
   );
-  const layers = useAtomValue(layersAtom).filter((layer) => layer.enabled);
+  const layers = useAtomValue(mergedLayersAtom).filter(
+    (layer) => layer.enabled,
+  );
 
   useEffect(() => {
     setSelectedLayer((x) => {
