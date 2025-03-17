@@ -2,7 +2,7 @@ use std::{env, sync::Arc};
 
 use crate::{
     chatter_context::ChatterContext,
-    chatter_message::{self, ChatterMessage},
+    chatter_message::ChatterMessage,
     error::Result,
     functions::{ExecutionContext, ExecutionContextBuilder},
     geom::GeometryWrapper,
@@ -41,6 +41,8 @@ impl Chatter {
                 panic!("Postgres connection error: {}", e);
             }
         });
+
+        client.batch_execute("SET statement_timeout = 5000").await?;
 
         let func_ctx = ExecutionContextBuilder::default()
             .client(client.clone())
@@ -126,7 +128,6 @@ impl Chatter {
         // Create the chat completion request
         let request = CreateChatCompletionRequestArgs::default()
             .max_completion_tokens(2048u32)
-            .temperature(0.2)
             .model(&self.context.model)
             .messages(
                 self.context
@@ -136,6 +137,8 @@ impl Chatter {
                     .collect::<Result<Vec<ChatCompletionRequestMessage>>>()?,
             )
             .tools(self.context.tools.clone())
+            // The following two options are supported by gpt-4o, but not o3-mini
+            .temperature(0.2)
             .parallel_tool_calls(false) // We only want to run one tool at a time
             .build()?;
 

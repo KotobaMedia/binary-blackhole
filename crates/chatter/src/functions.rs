@@ -182,7 +182,7 @@ impl ExecutionContext {
         let query = params.query.trim_end_matches(';');
 
         // println!("Attempting to execute: {}", query);
-        let explain_query = format!("explain {}", query);
+        let explain_query = format!("explain analyze {}", query);
         let result = self.client.query(&explain_query, &[]).await;
 
         match result {

@@ -21,8 +21,8 @@ importers:
         specifier: 2.184.1
         version: 2.184.1(constructs@10.4.2)
       cargo-lambda-cdk:
-        specifier: ^0.0.32
-        version: 0.0.32(aws-cdk-lib@2.184.1(constructs@10.4.2))(constructs@10.4.2)
+        specifier: ^0.0.33
+        version: 0.0.33(aws-cdk-lib@2.184.1(constructs@10.4.2))(constructs@10.4.2)
       constructs:
         specifier: ^10.4.2
         version: 10.4.2
@@ -1187,8 +1187,8 @@ packages:
   caniuse-lite@1.0.30001700:
     resolution: {integrity: sha512-2S6XIXwaE7K7erT8dY+kLQcpa5ms63XlRkMkReXjle+kf6c5g38vyMl+Z5y8dSxOFDhcFe+nxnn261PLxBSQsQ==}
 
-  cargo-lambda-cdk@0.0.32:
-    resolution: {integrity: sha512-y8u/2biaJhZ9DmWSHi6xN4OTOsRYhwySU61Yk8jCt5T4P+4OcktxdQcNvhHaFXc9Acb/5BVXewaVX6vybRVvfg==}
+  cargo-lambda-cdk@0.0.33:
+    resolution: {integrity: sha512-1N9BXaHk/jnESY+YduOqMpoJkd/qiAMqpZbgGDIGzIIz2KIxziWeZx4DWEFNGTZbczRrmryMkcef6PjKO6cE3w==}
     peerDependencies:
       aws-cdk-lib: ^2.63.0
       constructs: ^10.0.5
@@ -3928,7 +3928,7 @@ snapshots:
 
   caniuse-lite@1.0.30001700: {}
 
-  cargo-lambda-cdk@0.0.32(aws-cdk-lib@2.184.1(constructs@10.4.2))(constructs@10.4.2):
+  cargo-lambda-cdk@0.0.33(aws-cdk-lib@2.184.1(constructs@10.4.2))(constructs@10.4.2):
     dependencies:
       aws-cdk-lib: 2.184.1(constructs@10.4.2)
       constructs: 10.4.2

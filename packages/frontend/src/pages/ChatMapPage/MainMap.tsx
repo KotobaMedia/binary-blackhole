@@ -19,7 +19,7 @@ import {
   SelectedFeatureInfo,
   detailPaneVisibleAtom,
 } from "./atoms";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import MainMapStyle from "./MainMapStyle.json";
 import chroma from "chroma-js";
 import { BBox, useQuery } from "../../tools/query";
@@ -167,6 +167,62 @@ const MapLayer: React.FC<{
           "line-opacity": 0.8,
         }}
       />
+
+      {/* Selected outline for Points */}
+      <Layer
+        id={`${layer.name}/point-selected-outline`}
+        source={sourceId}
+        type="circle"
+        filter={["==", ["geometry-type"], "Point"]}
+        paint={{
+          "circle-radius": 7, // slightly larger than the data circle to create a gap
+          "circle-color": "transparent",
+          "circle-stroke-color": "#333333", // dark grey outline
+          "circle-stroke-width": 2,
+          "circle-stroke-opacity": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            1,
+            0,
+          ],
+        }}
+      />
+
+      {/* Selected outline for Lines */}
+      <Layer
+        id={`${layer.name}/line-selected-outline`}
+        source={sourceId}
+        type="line"
+        filter={["==", ["geometry-type"], "LineString"]}
+        paint={{
+          "line-color": "#333333", // dark grey outline
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            4,
+            0,
+          ],
+          "line-opacity": 1,
+        }}
+      />
+
+      {/* Selected outline for Polygons */}
+      <Layer
+        id={`${layer.name}/polygon-selected-outline`}
+        source={sourceId}
+        type="line"
+        filter={["==", ["geometry-type"], "Polygon"]}
+        paint={{
+          "line-color": "#333333", // dark grey outline
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            3,
+            0,
+          ],
+          "line-opacity": 1,
+        }}
+      />
     </Source>
   );
 };
@@ -177,7 +233,7 @@ const MainMap: React.FC = () => {
     Record<string, BBox | undefined>
   >({});
   const mapRef = useRef<MapRef>(null);
-  const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
+  const [selectedFeatures, setSelectedFeatures] = useAtom(selectedFeaturesAtom);
   const setDetailPaneVisible = useSetAtom(detailPaneVisibleAtom);
 
   // Handle bbox updates from individual layers
@@ -223,10 +279,10 @@ const MainMap: React.FC = () => {
             const geometryType = layerId.split("/")[1];
 
             // Log for debugging
-            console.log(`Feature from layer: ${layerName} (${geometryType})`);
-            console.log("Properties:", feature.properties);
-            console.log("Geometry type:", feature.geometry.type);
-            console.log("-------------------");
+            // console.log(`Feature from layer: ${layerName} (${geometryType})`);
+            // console.log("Properties:", feature.properties);
+            // console.log("Geometry type:", feature.geometry.type);
+            // console.log("-------------------");
 
             return {
               feature,
@@ -240,7 +296,7 @@ const MainMap: React.FC = () => {
         setSelectedFeatures(formattedFeatures);
         setDetailPaneVisible(true);
       } else {
-        console.log("No features found at this location");
+        // console.log("No features found at this location");
         // Clear selected features when clicking on empty space
         setSelectedFeatures([]);
       }
@@ -268,6 +324,31 @@ const MainMap: React.FC = () => {
       }
     }
   }, [layerBboxes]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    const f = selectedFeatures;
+    for (const { layerName, feature } of f) {
+      const sourceId = `source-${layerName}`;
+      const featureId = feature.id;
+      if (featureId !== undefined) {
+        map.setFeatureState(
+          { source: sourceId, id: featureId },
+          { selected: true },
+        );
+      }
+    }
+    return () => {
+      for (const { layerName, feature } of f) {
+        const sourceId = `source-${layerName}`;
+        const featureId = feature.id;
+        if (featureId !== undefined) {
+          map.removeFeatureState({ source: sourceId, id: featureId });
+        }
+      }
+    };
+  }, [selectedFeatures]);
 
   return (
     <Maplibre
