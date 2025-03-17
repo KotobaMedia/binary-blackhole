@@ -138,7 +138,7 @@ impl Chatter {
             )
             .tools(self.context.tools.clone())
             // The following two options are supported by gpt-4o, but not o3-mini
-            .temperature(0.2)
+            // .temperature(0.2)
             .parallel_tool_calls(false) // We only want to run one tool at a time
             .build()?;
 
