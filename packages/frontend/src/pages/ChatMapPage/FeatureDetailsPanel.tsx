@@ -1,19 +1,22 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import c from "classnames";
 import {
   detailPaneFullscreenAtom,
   detailPaneVisibleAtom,
-  mergedLayersAtom,
-  // selectedFeaturesAtom,
+  enabledLayersAtom,
+  selectedFeaturesAtom,
   SQLLayer,
 } from "./atoms";
 import NavDropdown from "react-bootstrap/NavDropdown";
 import BTable from "react-bootstrap/Table";
 import {
+  ColumnDef,
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  OnChangeFn,
+  RowSelectionState,
   useReactTable,
 } from "@tanstack/react-table";
 import {
@@ -23,14 +26,35 @@ import {
 } from "react-bootstrap-icons";
 import { useQuery } from "../../tools/query";
 import "./table.scss";
+import { Form } from "react-bootstrap";
 
 const LayerTableView: React.FC<{
   layer: SQLLayer;
 }> = ({ layer }) => {
-  // const selectedFeatures = useAtomValue(selectedFeaturesAtom).filter(
-  //   (feature) => feature.layerName === layer.name,
-  // );
-  // console.log("selectedFeatures", selectedFeatures);
+  const allSelectedFeatures = useAtomValue(selectedFeaturesAtom);
+  const selectedFeatures = useMemo(
+    () =>
+      allSelectedFeatures.filter((feature) => feature.layerName === layer.name),
+    [allSelectedFeatures, layer.name],
+  );
+  const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
+  const rowSelection: RowSelectionState = useMemo(() => {
+    const selected = selectedFeatures.reduce((acc, feature) => {
+      const rowId = feature.feature.id?.toString();
+      if (!rowId) {
+        return acc;
+      }
+      acc[rowId] = true;
+      return acc;
+    }, {} as RowSelectionState);
+    return selected;
+  }, [selectedFeatures]);
+  const setRowSelection = useCallback<OnChangeFn<RowSelectionState>>(
+    (_updater) => {
+      // TODO: Implement this
+    },
+    [setSelectedFeatures],
+  );
   const { data: resp } = useQuery(layer.sql);
   const [data, columns] = useMemo(() => {
     if (!resp || resp.data.features.length === 0) {
@@ -38,18 +62,34 @@ const LayerTableView: React.FC<{
     }
     const features = resp.data.features;
     const columnHelper = createColumnHelper<GeoJSON.Feature>();
-    const columns = Object.keys(features[0].properties!)
-      .filter((key) => {
-        if (key.startsWith("_")) {
-          return false;
-        }
-        return true;
-      })
-      .map((key) =>
-        columnHelper.accessor((row) => (row.properties || {})[key], {
-          id: key,
-        }),
-      );
+    let columns: ColumnDef<GeoJSON.Feature>[] = [
+      {
+        id: "select-col",
+        size: 30,
+        header: ({ table }) => (
+          <Form.Check
+            checked={table.getIsAllRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()} //or getToggleAllPageRowsSelectedHandler
+          />
+        ),
+        cell: ({ row }) => (
+          <Form.Check
+            checked={row.getIsSelected()}
+            disabled={!row.getCanSelect()}
+            onChange={row.getToggleSelectedHandler()}
+          />
+        ),
+      },
+    ];
+    columns = columns.concat(
+      Object.keys(features[0].properties!)
+        .filter((key) => !key.startsWith("_"))
+        .map((key) =>
+          columnHelper.accessor((row) => (row.properties || {})[key], {
+            id: key,
+          }),
+        ),
+    );
     return [features, columns];
   }, [resp]);
   const table = useReactTable({
@@ -57,92 +97,92 @@ const LayerTableView: React.FC<{
     columns,
     getCoreRowModel: getCoreRowModel(),
     columnResizeMode: "onChange",
-    getRowId: (row, idx) => (row.id ?? idx).toString(),
+    getRowId: (feature, idx) => {
+      return (feature.id ?? idx).toString();
+    },
+    onRowSelectionChange: setRowSelection,
+    state: {
+      rowSelection,
+    },
     enableRowSelection: true,
-    enableMultiRowSelection: false,
   });
-  // useEffect(() => {
-  //   table.setRowSelection(
-  //     Object.fromEntries(
-  //       selectedFeatures
-  //         .map((feature) => feature?.feature?.id?.toString())
-  //         .filter(Boolean)
-  //         .map((id) => [id, true] as const),
-  //     ),
-  //   );
-  // }, [table, selectedFeatures]);
 
   return (
-    <BTable striped bordered hover responsive size="sm" className="data-table">
-      <thead className="position-sticky top-0">
-        {table.getHeaderGroups().map((headerGroup) => (
-          <tr key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <th
-                key={header.id}
-                colSpan={header.colSpan}
-                style={{ width: header.getSize(), position: "relative" }}
-              >
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )}
-                <div
-                  onDoubleClick={() => header.column.resetSize()}
-                  onMouseDown={header.getResizeHandler()}
-                  onTouchStart={header.getResizeHandler()}
-                  className={c(`resizer ltr`, {
-                    isResizing: header.column.getIsResizing(),
-                  })}
-                />
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody>
-        {table.getRowModel().rows.map((row) => (
-          <tr key={row.id} className={c({ selected: row.getIsSelected() })}>
-            {row.getVisibleCells().map((cell) => (
-              <td key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-      <tfoot>
-        {table.getFooterGroups().map((footerGroup) => (
-          <tr key={footerGroup.id}>
-            {footerGroup.headers.map((header) => (
-              <th key={header.id} colSpan={header.colSpan}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.footer,
-                      header.getContext(),
-                    )}
-              </th>
-            ))}
-          </tr>
-        ))}
-      </tfoot>
-    </BTable>
+    <div className="table-responsive">
+      <BTable striped bordered hover size="sm" className="data-table">
+        <thead className="position-sticky top-0">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <th
+                  key={header.id}
+                  colSpan={header.colSpan}
+                  style={{ width: header.getSize(), position: "relative" }}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                  <div
+                    onDoubleClick={() => header.column.resetSize()}
+                    onMouseDown={header.getResizeHandler()}
+                    onTouchStart={header.getResizeHandler()}
+                    className={c(`resizer ltr`, {
+                      isResizing: header.column.getIsResizing(),
+                    })}
+                  />
+                </th>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map((row) => (
+            <tr
+              key={row.id}
+              data-row-id={row.id}
+              className={c({ "table-secondary": row.getIsSelected() })}
+              onClick={row.getToggleSelectedHandler()}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          {table.getFooterGroups().map((footerGroup) => (
+            <tr key={footerGroup.id}>
+              {footerGroup.headers.map((header) => (
+                <th key={header.id} colSpan={header.colSpan}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.footer,
+                        header.getContext(),
+                      )}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </tfoot>
+      </BTable>
+    </div>
   );
 };
 
 const FeatureDetailsPanel: React.FC = () => {
   const setVisible = useSetAtom(detailPaneVisibleAtom);
   const [fullscreen, setFullscreen] = useAtom(detailPaneFullscreenAtom);
-
   const [selectedLayer, setSelectedLayer] = useState<SQLLayer | undefined>(
     undefined,
   );
-  const layers = useAtomValue(mergedLayersAtom).filter(
-    (layer) => layer.enabled,
-  );
+  const layers = useAtomValue(enabledLayersAtom);
+  const selectedFeatures = useAtomValue(selectedFeaturesAtom);
 
   useEffect(() => {
     setSelectedLayer((x) => {
@@ -153,9 +193,21 @@ const FeatureDetailsPanel: React.FC = () => {
     });
   }, [layers]);
 
+  useEffect(() => {
+    // Select the layer of the first selected feature
+    if (selectedFeatures.length > 0) {
+      const layer = layers.find(
+        (layer) => layer.name === selectedFeatures[0].layerName,
+      );
+      if (layer) {
+        setSelectedLayer(layer);
+      }
+    }
+  }, [layers, selectedFeatures, setSelectedLayer]);
+
   return (
-    <div className="feature-details-panel h-100 overflow-auto px-3">
-      <nav className="navbar position-sticky top-0 bg-body bg-opacity-75">
+    <div className="feature-details-panel h-100 d-flex flex-column px-3">
+      <nav className="navbar">
         <div className="container-fluid">
           <button className="btn" onClick={() => setFullscreen((x) => !x)}>
             {fullscreen ? <ArrowsCollapseVertical /> : <ArrowsExpandVertical />}

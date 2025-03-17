@@ -32,6 +32,12 @@ export const mergedLayersAtom = atom<SQLLayer[]>((get) => {
   }, []);
   return dedupedLayers;
 });
+export const enabledLayersAtom = atom<SQLLayer[]>((get) => {
+  const allLayers = get(mergedLayersAtom);
+  const enabledLayers = allLayers.filter((layer) => layer.enabled);
+  return enabledLayers;
+});
+
 export const selectedFeaturesAtom = atom<SelectedFeatureInfo[]>([]);
 
 export const detailPaneVisibleAtom = atom(false);

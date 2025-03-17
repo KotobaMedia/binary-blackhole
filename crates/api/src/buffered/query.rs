@@ -37,6 +37,9 @@ async fn post_query_handler(
         feature.geometry = Some((&row.geom).into());
         geometries.push(Geometry::from(row.geom));
         if let Value::Object(props) = row.properties {
+            if let Some(id) = props.get("_id") {
+                feature.id = Some(geojson::feature::Id::String(id.to_string()));
+            }
             feature.properties = Some(props);
         }
         fc.features.push(feature);
