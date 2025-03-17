@@ -1,9 +1,7 @@
-use std::{env, sync::Arc};
-
 use crate::{
     chatter_context::ChatterContext,
     chatter_message::ChatterMessage,
-    error::Result,
+    error::{ChatterError, Result},
     functions::{ExecutionContext, ExecutionContextBuilder},
     geom::GeometryWrapper,
 };
@@ -14,6 +12,7 @@ use async_openai::types::{
 use async_stream::try_stream;
 use futures::Stream;
 use geo_types::Geometry;
+use std::{env, sync::Arc};
 use tokio_postgres::NoTls;
 
 pub struct QueryResultRow {
@@ -178,30 +177,87 @@ impl Chatter {
     /// should actually run the query, store the result somewhere, then return the ID of
     /// the execution, rendering this function obsolete. This is used in the meantime.
     pub async fn execute_query(&mut self, query: &str) -> Result<Vec<QueryResultRow>> {
-        // we wrap the query so we get the geometry and attributes in the correct formats
-        let internal_query = format!(
-            r#"
-            SELECT
-                "bbh_internal_query"."geom",
-                to_jsonb("bbh_internal_query") - 'geom' AS "properties"
-            FROM (
-                {}
-            ) AS "bbh_internal_query"
-        "#,
-            query
-        );
-        let rows = self
-            .pg_client
-            .query(&internal_query, &[])
-            .await?
-            .iter()
-            .map(|row| {
-                let geom: Geometry = row.get::<_, GeometryWrapper>("geom").0;
-                let properties: serde_json::Value = row.get("properties");
-                QueryResultRow { geom, properties }
-            })
-            .collect();
-        Ok(rows)
+        // Execute the provided query directly.
+        let rows = self.pg_client.query(query, &[]).await?;
+        let mut results = Vec::with_capacity(rows.len());
+
+        for row in rows {
+            let mut geom: Option<Geometry> = None;
+            let mut properties = serde_json::Map::new();
+
+            // Iterate over each column in the row.
+            for (i, column) in row.columns().iter().enumerate() {
+                // Check if this column is of the geometry type.
+                // (Adjust the condition if your type detection is different.)
+                if column.type_().name() == "geometry" {
+                    // Convert using your GeometryWrapper.
+                    // This assumes that GeometryWrapper implements FromSql.
+                    geom = Some(row.get::<_, GeometryWrapper>(i).0);
+                } else {
+                    let value = convert_column_value(&row, i, column);
+                    properties.insert(column.name().to_string(), value);
+                }
+            }
+
+            // Return an error if no geometry column was found.
+            let geom = geom.ok_or_else(|| ChatterError::GeometryNotFound)?;
+            results.push(QueryResultRow {
+                geom,
+                properties: serde_json::Value::Object(properties),
+            });
+        }
+        Ok(results)
+    }
+}
+
+// Helper function to convert a column value to serde_json::Value based on its type.
+fn convert_column_value(
+    row: &tokio_postgres::Row,
+    index: usize,
+    column: &tokio_postgres::Column,
+) -> serde_json::Value {
+    match column.type_().name() {
+        // Convert text types to JSON string.
+        "varchar" | "text" => {
+            let s: String = row.get(index);
+            serde_json::Value::String(s)
+        }
+        // Convert integer types.
+        "int4" => {
+            let v: i32 = row.get(index);
+            serde_json::Value::Number(v.into())
+        }
+        "int8" => {
+            let v: i64 = row.get(index);
+            serde_json::Value::Number(v.into())
+        }
+        // Convert floating point types.
+        "float4" => {
+            let v: f32 = row.get(index);
+            serde_json::Number::from_f64(v as f64)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "float8" => {
+            let v: f64 = row.get(index);
+            serde_json::Number::from_f64(v)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null)
+        }
+        // Convert boolean types.
+        "bool" => {
+            let v: bool = row.get(index);
+            serde_json::Value::Bool(v)
+        }
+        // If the column is already in JSON format.
+        "json" | "jsonb" => row.get(index),
+        // Fallback: attempt to get a string representation.
+        _ => {
+            // Using try_get to avoid panics if conversion fails.
+            let s: Option<String> = row.try_get(index).ok();
+            s.map(serde_json::Value::String)
+                .unwrap_or(serde_json::Value::Null)
+        }
     }
 }
 

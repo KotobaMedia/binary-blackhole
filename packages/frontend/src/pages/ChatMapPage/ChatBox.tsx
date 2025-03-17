@@ -375,7 +375,7 @@ const ChatBox: React.FC = () => {
   return (
     <div
       ref={messageContainerRef}
-      className="d-flex flex-column h-100 overflow-y-auto overflow-x-hidden p-3"
+      className="d-flex flex-column h-100 overflow-y-auto overflow-x-hidden px-3"
     >
       <Header />
       <div className="d-flex flex-column flex-grow-1">

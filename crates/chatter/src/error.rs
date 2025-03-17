@@ -18,6 +18,9 @@ pub enum ChatterError {
     UnknownToolCall(String),
     #[error("Unknown Role: {0}")]
     UnknownRole(String),
+
+    #[error("Geometry was not found in the query result")]
+    GeometryNotFound,
 }
 
 pub type Result<T> = std::result::Result<T, ChatterError>;

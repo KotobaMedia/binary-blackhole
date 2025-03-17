@@ -106,9 +106,10 @@ const MapLayer: React.FC<{
 
   if (error) {
     console.error(`Error loading layer ${layer.name}:`, error);
-    return null;
+    return <></>;
   }
-  if (!resp || !featureCollection) return null;
+  if (!resp || !featureCollection) return <></>;
+  if (featureCollection.features.length === 0) return <></>;
 
   const sourceId = `source-${layer.name}`;
   const layerColor = getLayerColor(layer.name);
@@ -228,7 +229,9 @@ const MapLayer: React.FC<{
 };
 
 const MainMap: React.FC = () => {
-  const layers = useAtomValue(layersAtom).filter((layer) => layer.enabled);
+  const layers = useAtomValue(layersAtom).filter(
+    (layer) => layer.enabled && !layer.error,
+  );
   const [layerBboxes, setLayerBboxes] = useState<
     Record<string, BBox | undefined>
   >({});
@@ -279,10 +282,10 @@ const MainMap: React.FC = () => {
             const geometryType = layerId.split("/")[1];
 
             // Log for debugging
-            // console.log(`Feature from layer: ${layerName} (${geometryType})`);
-            // console.log("Properties:", feature.properties);
-            // console.log("Geometry type:", feature.geometry.type);
-            // console.log("-------------------");
+            console.log(`Feature from layer: ${layerName} (${geometryType})`);
+            console.log("Properties:", feature.properties);
+            console.log("Geometry type:", feature.geometry.type);
+            console.log("-------------------");
 
             return {
               feature,
@@ -296,7 +299,7 @@ const MainMap: React.FC = () => {
         setSelectedFeatures(formattedFeatures);
         setDetailPaneVisible(true);
       } else {
-        // console.log("No features found at this location");
+        console.log("No features found at this location");
         // Clear selected features when clicking on empty space
         setSelectedFeatures([]);
       }

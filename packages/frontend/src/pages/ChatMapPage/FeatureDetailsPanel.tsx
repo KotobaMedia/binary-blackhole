@@ -5,7 +5,7 @@ import {
   detailPaneFullscreenAtom,
   detailPaneVisibleAtom,
   layersAtom,
-  selectedFeaturesAtom,
+  // selectedFeaturesAtom,
   SQLLayer,
 } from "./atoms";
 import NavDropdown from "react-bootstrap/NavDropdown";
@@ -27,10 +27,10 @@ import "./table.scss";
 const LayerTableView: React.FC<{
   layer: SQLLayer;
 }> = ({ layer }) => {
-  const selectedFeatures = useAtomValue(selectedFeaturesAtom).filter(
-    (feature) => feature.layerName === layer.name,
-  );
-  console.log("selectedFeatures", selectedFeatures);
+  // const selectedFeatures = useAtomValue(selectedFeaturesAtom).filter(
+  //   (feature) => feature.layerName === layer.name,
+  // );
+  // console.log("selectedFeatures", selectedFeatures);
   const { data: resp } = useQuery(layer.sql);
   const [data, columns] = useMemo(() => {
     if (!resp || resp.data.features.length === 0) {
