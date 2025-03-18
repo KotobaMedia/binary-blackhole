@@ -219,43 +219,48 @@ fn convert_column_value(
     match column.type_().name() {
         // Convert text types to JSON string.
         "varchar" | "text" => {
-            let s: String = row.get(index);
-            serde_json::Value::String(s)
+            let s: Option<String> = row.get(index);
+            s.map(serde_json::Value::String)
+                .unwrap_or(serde_json::Value::Null)
         }
         // Convert integer types.
         "int4" => {
-            let v: i32 = row.get(index);
-            serde_json::Value::Number(v.into())
+            let v: Option<i32> = row.get(index);
+            v.map(|v| serde_json::Value::Number(v.into()))
+                .unwrap_or(serde_json::Value::Null)
         }
         "int8" => {
-            let v: i64 = row.get(index);
-            serde_json::Value::Number(v.into())
+            let v: Option<i64> = row.get(index);
+            v.map(|v| serde_json::Value::Number(v.into()))
+                .unwrap_or(serde_json::Value::Null)
         }
         // Convert floating point types.
         "float4" => {
-            let v: f32 = row.get(index);
-            serde_json::Number::from_f64(v as f64)
+            let v: Option<f32> = row.get(index);
+            v.and_then(|v| serde_json::Number::from_f64(v as f64))
                 .map(serde_json::Value::Number)
                 .unwrap_or(serde_json::Value::Null)
         }
         "float8" => {
-            let v: f64 = row.get(index);
-            serde_json::Number::from_f64(v)
+            let v: Option<f64> = row.get(index);
+            v.and_then(serde_json::Number::from_f64)
                 .map(serde_json::Value::Number)
                 .unwrap_or(serde_json::Value::Null)
         }
         // Convert boolean types.
         "bool" => {
-            let v: bool = row.get(index);
-            serde_json::Value::Bool(v)
+            let v: Option<bool> = row.get(index);
+            v.map(serde_json::Value::Bool)
+                .unwrap_or(serde_json::Value::Null)
         }
         // If the column is already in JSON format.
-        "json" | "jsonb" => row.get(index),
+        "json" | "jsonb" => {
+            let v: Option<serde_json::Value> = row.get(index);
+            v.unwrap_or(serde_json::Value::Null)
+        }
         // Fallback: attempt to get a string representation.
         _col_type_name => {
-            // Using try_get to avoid panics if conversion fails.
-            let s: Option<String> = row.try_get(index).ok();
-            // println!("Unknown type: {} {:?}", _col_type_name, s);
+            let s: Option<String> = row.try_get(index).ok().flatten();
             s.map(serde_json::Value::String)
                 .unwrap_or(serde_json::Value::Null)
         }
