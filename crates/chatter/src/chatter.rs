@@ -106,13 +106,12 @@ impl Chatter {
                 yield cmessage;
 
                 if let Some(tool_calls) = message.tool_calls {
-                    // Execute the tool call and get the response message
-                    let tool_response = self.execute_tool_call(tool_calls[0].clone()).await?;
-
-                    // Add the tool response to the context
-                    self.context.add_message(tool_response.clone());
-                    yield tool_response;
-
+                    // Iterate over all tool calls and process each one
+                    for tool_call in tool_calls {
+                        let tool_response = self.execute_tool_call(tool_call).await?;
+                        self.context.add_message(tool_response.clone());
+                        yield tool_response;
+                    }
                     // Continue the loop to process the next message
                 } else {
                     // No tool call, that means that the assistant has finished.
@@ -138,7 +137,7 @@ impl Chatter {
             .tools(self.context.tools.clone())
             // The following two options are supported by gpt-4o, but not o3-mini
             // .temperature(0.2)
-            .parallel_tool_calls(false) // We only want to run one tool at a time
+            // .parallel_tool_calls(false) // We only want to run one tool at a time
             .build()?;
 
         // Send the request and get the response

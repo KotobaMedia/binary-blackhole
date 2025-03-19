@@ -1,5 +1,6 @@
 import React, { JSX, useCallback, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { QuestionCircleFill } from "react-bootstrap-icons";
 import useSWR from "swr";
 import { format as formatSQL } from "sql-formatter";
@@ -332,7 +333,16 @@ const ChatBox: React.FC = () => {
         } else if (content.role === "assistant") {
           return (
             <AssistantMessage key={message.id}>
-              <ReactMarkdown>{content.message}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  table: ({ node, ...props }) => (
+                    <table className="table" {...props} />
+                  ),
+                }}
+              >
+                {content.message}
+              </ReactMarkdown>
             </AssistantMessage>
           );
         } else if (

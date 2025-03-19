@@ -16,6 +16,8 @@ pub enum ChatterMessageSidecar {
 
     /// Execute some SQL. (name, SQL query)
     SQLExecution((String, String)),
+    /// A failed SQL execution.
+    SQLExecutionError,
 
     /// A database lookup.
     DatabaseLookup,

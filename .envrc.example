@@ -1,5 +1,6 @@
 export OPENAI_API_KEY="..."
 export POSTGRES_CONN_STR="host=localhost dbname=bbh"
+export POSTGRES_CONN_STR_TEST="host=localhost dbname=bbh-test"
 
 export AWS_PROFILE="..."
 export CDK_DEV_ACCOUNT_ID="..."

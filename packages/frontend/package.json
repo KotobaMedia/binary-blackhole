@@ -23,6 +23,7 @@
         "react-dom": "^19.0.0",
         "react-map-gl": "^8.0.1",
         "react-markdown": "^10.1.0",
+        "remark-gfm": "^4.0.1",
         "sql-formatter": "^15.4.11",
         "swr": "^2.3.3",
         "wouter": "^3.6.0"

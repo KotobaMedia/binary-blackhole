@@ -92,6 +92,28 @@ const LayerTableView: React.FC<{
     );
     return [features, columns];
   }, [resp]);
+
+  useEffect(() => {
+    // Scroll the selected row in to view if it is not visible
+    const selectedRow = document.querySelector(".table-responsive tr.selected");
+    if (selectedRow) {
+      const tableBody = selectedRow.closest(".table-responsive");
+      if (tableBody) {
+        // debugger;
+        const { top, bottom } = selectedRow.getBoundingClientRect();
+        const { top: tableTop, bottom: tableBottom } =
+          tableBody.getBoundingClientRect();
+        if (top < tableTop || bottom > tableBottom) {
+          selectedRow.scrollIntoView({
+            behavior: "auto",
+            block: "center",
+            inline: "nearest",
+          });
+        }
+      }
+    }
+  }, [rowSelection]);
+
   const table = useReactTable({
     data,
     columns,
@@ -143,7 +165,10 @@ const LayerTableView: React.FC<{
             <tr
               key={row.id}
               data-row-id={row.id}
-              className={c({ "table-secondary": row.getIsSelected() })}
+              className={c({
+                "table-secondary": row.getIsSelected(),
+                selected: row.getIsSelected(),
+              })}
               onClick={row.getToggleSelectedHandler()}
             >
               {row.getVisibleCells().map((cell) => (

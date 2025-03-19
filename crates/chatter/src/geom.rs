@@ -23,3 +23,26 @@ impl<'a> FromSql<'a> for GeometryWrapper {
         ty.name() == "geometry" || ty.name() == "geography"
     }
 }
+
+impl GeometryWrapper {
+    pub fn variant_name(&self) -> &'static str {
+        match self.0 {
+            Geometry::Point(_) => "Point",
+            Geometry::LineString(_) => "LineString",
+            Geometry::Polygon(_) => "Polygon",
+            Geometry::MultiPoint(_) => "MultiPoint",
+            Geometry::MultiLineString(_) => "MultiLineString",
+            Geometry::MultiPolygon(_) => "MultiPolygon",
+            Geometry::GeometryCollection(_) => "GeometryCollection",
+            Geometry::Line(_) => "Line",
+            Geometry::Rect(_) => "Rect",
+            Geometry::Triangle(_) => "Triangle",
+        }
+    }
+}
+
+impl ToString for GeometryWrapper {
+    fn to_string(&self) -> String {
+        self.variant_name().to_string()
+    }
+}

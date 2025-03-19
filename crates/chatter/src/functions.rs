@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
+use crate::rows_to_tsv::{has_geometry_column, rows_to_tsv};
 use crate::{
     chatter_message::{ChatterMessage, ChatterMessageSidecar},
     error::Result,
@@ -28,7 +29,7 @@ pub struct DescribeTablesParams {
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 pub struct QueryDatabaseParams {
-    /// The name this query will be referred to as. This will be shown to the user. It should be short and descriptive.
+    /// The name this query will be referred to as. This will be shown to the user. It must be short and descriptive.
     name: String,
 
     /// The SQL query to execute.
@@ -160,7 +161,7 @@ impl ExecutionContext {
         let parameters_schema = json!(schema_for!(QueryDatabaseParams));
         FunctionObject {
             name: "query_database".into(),
-            description: Some("Query the database and show results to the user.".into()),
+            description: Some("Query the database and show results to the user. You will have access to a limited subset of the output.\nIf the query is not correct, an error message will be returned.\nIf an error is returned, rewrite the query and try again.\nIf the result set is empty, try again.".into()),
             parameters: Some(parameters_schema),
             strict: Some(true),
         }
@@ -178,24 +179,66 @@ impl ExecutionContext {
         tool_call_id: &str,
         params: QueryDatabaseParams,
     ) -> Result<ChatterMessage> {
-        // simple filter: remove the trailing semicolon
         let query = params.query.trim_end_matches(';');
 
-        // println!("Attempting to execute: {}", query);
-        let explain_query = format!("explain analyze {}", query);
+        let sample_size = 5;
+        let explain_query = format!(
+            r#"
+            WITH numbered AS (
+                SELECT row_number() OVER () AS __rn, t.*
+                FROM ({}) AS t
+            ), total AS (
+                SELECT count(*) AS cnt FROM numbered
+            ), random_indices AS (
+                SELECT floor(random() * cnt)::int + 1 as __rn
+                FROM total, generate_series(1, {})
+            )
+            SELECT *
+            FROM numbered
+            WHERE __rn IN (
+                SELECT __rn FROM random_indices
+            )
+            ORDER BY __rn;
+            "#,
+            query, sample_size,
+        );
         let result = self.client.query(&explain_query, &[]).await;
 
         match result {
             Ok(rows) => {
-                let plan = rows
-                    .iter()
-                    .map(|row| row.get::<_, String>(0))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                let message = format!("Query plan:\n```\n{}\n```", plan);
+                if rows.len() == 0 {
+                    return Ok(ChatterMessage {
+                        message: Some(
+                            "Failed to execute query: The result set is empty. Try again."
+                                .to_string(),
+                        ),
+                        role: Role::Tool,
+                        tool_calls: None,
+                        tool_call_id: Some(tool_call_id.into()),
+                        sidecar: ChatterMessageSidecar::SQLExecutionError,
+                    });
+                }
+
+                if !has_geometry_column(&rows[0]) {
+                    return Ok(ChatterMessage {
+                        message: Some(
+                            "Failed to execute query: `geom` column was not in the result set."
+                                .to_string(),
+                        ),
+                        role: Role::Tool,
+                        tool_calls: None,
+                        tool_call_id: Some(tool_call_id.into()),
+                        sidecar: ChatterMessageSidecar::SQLExecutionError,
+                    });
+                }
+
+                let tsv = rows_to_tsv(&rows);
                 println!("SQL [{}]: {}", params.name, &query);
                 return Ok(ChatterMessage {
-                    message: Some(message),
+                    message: Some(format!("
+                        Result: \n{}\n
+                        Note: This is a random sample of the result set.\nDon't reveal it to the user, but you may use it to help followup questions.",
+                        tsv)),
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
@@ -224,7 +267,7 @@ impl ExecutionContext {
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
-                    sidecar: ChatterMessageSidecar::None,
+                    sidecar: ChatterMessageSidecar::SQLExecutionError,
                 });
             }
         }

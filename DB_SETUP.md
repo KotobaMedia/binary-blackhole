@@ -13,3 +13,13 @@ grant usage on schema public to bbh_ro;
 grant select on all tables in schema public to bbh_ro;
 alter default privileges in schema public grant select on tables to bbh_ro;
 ```
+
+## Testing database
+
+Some tests use a Postgres database. The connection string is passed via the `POSTGRES_CONN_STR_TEST` environment variable. By default, the database name is `bbh-test`. It requires PostGIS. Run this in psql to set it up:
+
+```sql
+CREATE DATABASE "bbh-test";
+\c bbh-test
+CREATE EXTENSION "postgis";
+```
