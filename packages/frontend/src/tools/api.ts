@@ -50,7 +50,9 @@ export async function* streamJsonLines<T>(
 
         if (line) {
           try {
-            yield JSON.parse(line) as T;
+            const parsed_line = JSON.parse(line) as T;
+            console.log(`[got line]`, parsed_line);
+            yield parsed_line;
           } catch (err) {
             console.warn("Failed to parse line as JSON:", line, err);
           }

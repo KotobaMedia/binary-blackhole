@@ -15,8 +15,7 @@ pub struct ChatterContext {
 }
 
 impl ChatterContext {
-    /// Create a new context with default parameters.
-    pub async fn new(client: &tokio_postgres::Client) -> Result<Self> {
+    async fn create_system_message(client: &tokio_postgres::Client) -> Result<ChatterMessage> {
         let mut tables: String = String::new();
         let rows = client
             .query(
@@ -35,17 +34,22 @@ impl ChatterContext {
             tables.push_str(&format!("- `{}`: {}\n", table_name, name));
         }
 
+        Ok(ChatterMessage {
+            message: Some(
+                format!(include_str!("../data/system_prompt_01.txt"), tables).to_string(),
+            ),
+            role: Role::System,
+            tool_calls: None,
+            tool_call_id: None,
+            sidecar: ChatterMessageSidecar::None,
+        })
+    }
+
+    /// Create a new context with default parameters.
+    pub async fn new(client: &tokio_postgres::Client) -> Result<Self> {
         Ok(Self {
             id: Ulid::new().to_string(),
-            messages: vec![ChatterMessage {
-                message: Some(
-                    format!(include_str!("../data/system_prompt_01.txt"), tables).to_string(),
-                ),
-                role: Role::System,
-                tool_calls: None,
-                tool_call_id: None,
-                sidecar: ChatterMessageSidecar::None,
-            }],
+            messages: vec![Self::create_system_message(client).await?],
             model: "gpt-4o".to_string(),
             tools: vec![
                 ExecutionContext::describe_tables_tool(),
@@ -56,8 +60,15 @@ impl ChatterContext {
 
     /// Instantiate a new context with stored messages.
     /// This is used when a user returns to a previous conversation.
-    pub fn new_with_stored(id: String, messages: Vec<ChatterMessage>) -> Self {
-        Self {
+    /// Note that the system message isn't included, so it is recreated and added.
+    pub async fn new_with_stored(
+        client: &tokio_postgres::Client,
+        id: String,
+        mut messages: Vec<ChatterMessage>,
+    ) -> Result<Self> {
+        let system_msg = Self::create_system_message(client).await?;
+        messages.insert(0, system_msg);
+        Ok(Self {
             id,
             messages,
             model: "gpt-4o".to_string(),
@@ -65,7 +76,7 @@ impl ChatterContext {
                 ExecutionContext::describe_tables_tool(),
                 ExecutionContext::query_database_tool(),
             ],
-        }
+        })
     }
 
     pub fn add_message(&mut self, message: ChatterMessage) {

@@ -7,6 +7,7 @@ use crate::{
 };
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObject, Role};
 use derive_builder::Builder;
+use indoc::indoc;
 use km_to_sql::metadata::ColumnMetadata;
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
@@ -201,10 +202,15 @@ impl ExecutionContext {
                 let tsv = rows_to_tsv(&rows);
                 println!("SQL [{}]: {}", params.name, &query);
                 return Ok(ChatterMessage {
-                    message: Some(format!("
-                        Result: \n{}\n
-                        Note: This is a random sample of the result set.\nDon't reveal it to the user, but you may use it to help followup questions.",
-                        tsv)),
+                    message: Some(format!(
+                        indoc! {"
+                            Sample of result:
+                            {}
+
+                            IMPORTANT: This is a random sample of the result set. Don't reveal it to the user, but you may use it to help followup questions.
+                        "},
+                        tsv
+                    )),
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),

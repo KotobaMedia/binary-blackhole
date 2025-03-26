@@ -41,7 +41,9 @@ impl Chatter {
             }
         });
 
-        client.batch_execute("SET statement_timeout = 5000").await?;
+        client
+            .batch_execute("SET statement_timeout = 20000")
+            .await?;
 
         let func_ctx = ExecutionContextBuilder::default()
             .client(client.clone())
@@ -285,10 +287,10 @@ mod tests {
         let rows = chatter
             .execute_query(
                 r#"
-            SELECT
-                'hello' as "name",
-                ST_Point(35, 135, 4326) as "geom"
-        "#,
+                SELECT
+                    'hello' as "name",
+                    ST_Point(35, 135, 4326) as "geom"
+                "#,
             )
             .await?;
         assert!(!rows.is_empty());

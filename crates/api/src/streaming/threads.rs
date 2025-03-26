@@ -48,9 +48,11 @@ async fn create_thread_message_handler(
         let mut chatter = state.chatter.lock().await.clone();
         if !messages.is_empty() {
             let ctx = ChatterContext::new_with_stored(
+                &chatter.pg_client,
                 thread_id.to_string(),
                 messages.into_iter().map(|m| m.msg).collect(),
-            );
+            )
+            .await?;
             chatter.switch_context(ctx);
         } else {
             chatter.new_context().await?;
@@ -105,6 +107,7 @@ async fn create_thread_message_handler(
 
             let message_view: MessageView = message.into();
             let message_json = serde_json::to_string(&message_view)?;
+            println!("sending message to user: {}", &message_json);
             Ok::<_, AppError>(Bytes::from(message_json + "\n"))
         })
         .map(|res| {
