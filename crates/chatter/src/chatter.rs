@@ -42,7 +42,7 @@ impl Chatter {
         });
 
         client
-            .batch_execute("SET statement_timeout = 20000")
+            .batch_execute("SET statement_timeout = 10000")
             .await?;
 
         let func_ctx = ExecutionContextBuilder::default()

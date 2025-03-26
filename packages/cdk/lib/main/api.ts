@@ -71,7 +71,7 @@ export class API extends Construct {
         OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
       },
       memorySize: 512,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(120),
       vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,

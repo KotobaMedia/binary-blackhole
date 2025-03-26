@@ -47,5 +47,18 @@ export class VPC extends Construct {
       enableDnsHostnames: true,
       enableDnsSupport: true,
     });
+
+    // Add route to ENI for destination 100.64.0.0/10 on all subnet route tables
+    [
+      ...this.vpc.publicSubnets,
+      ...this.vpc.privateSubnets,
+      ...this.vpc.isolatedSubnets,
+    ].forEach((subnet, index) => {
+      new ec2.CfnRoute(this, `SubnetRouteToEni${index}`, {
+        routeTableId: subnet.routeTable.routeTableId,
+        destinationCidrBlock: "100.64.0.0/10",
+        networkInterfaceId: "eni-081720ab89f3b7ba1",
+      });
+    });
   }
 }
