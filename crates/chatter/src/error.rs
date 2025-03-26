@@ -21,6 +21,9 @@ pub enum ChatterError {
 
     #[error("Geometry was not found in the query result")]
     GeometryNotFound,
+
+    #[error("ToSQL Error: {0}")]
+    ToSQLError(#[from] km_to_sql::error::Error),
 }
 
 pub type Result<T> = std::result::Result<T, ChatterError>;

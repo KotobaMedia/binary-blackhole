@@ -1,7 +1,5 @@
 //! LLM functions that will be called by the LLM runtime.
 
-use std::{collections::HashMap, fmt::Display, sync::Arc};
-
 use crate::rows_to_tsv::{has_geometry_column, rows_to_tsv};
 use crate::{
     chatter_message::{ChatterMessage, ChatterMessageSidecar},
@@ -9,10 +7,11 @@ use crate::{
 };
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObject, Role};
 use derive_builder::Builder;
+use km_to_sql::metadata::ColumnMetadata;
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio_postgres::types::Json;
+use std::sync::Arc;
 
 #[derive(Builder, Clone)]
 #[builder(pattern = "owned")]
@@ -36,47 +35,33 @@ pub struct QueryDatabaseParams {
     query: String,
 }
 
-#[derive(Deserialize, Debug)]
-struct DescribeTableAttribute {
-    attr_name: String,
-    attr_description: String,
-    attr_type: String,
-    attr_ref: Option<RefType>,
-}
-
-#[derive(Debug, Deserialize)]
-enum RefType {
-    Enum(Vec<String>),
-    Code(HashMap<String, String>),
-}
-
-impl Display for DescribeTableAttribute {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "`{}`: {} ({})",
-            self.attr_name, self.attr_description, self.attr_type
-        )?;
-        if let Some(ref_type) = &self.attr_ref {
-            match ref_type {
-                RefType::Enum(values) => {
-                    write!(f, " possible values: {}", values.join(", "))?;
-                }
-                RefType::Code(code_map) => {
-                    write!(
-                        f,
-                        " coded values: {}",
-                        code_map
-                            .iter()
-                            .map(|(k, v)| format!("`{}`: {}", k, v))
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )?;
-                }
-            }
-        }
-        Ok(())
+fn format_column(column: &ColumnMetadata) -> String {
+    let mut out = format!("  - `{}`", column.name);
+    if let Some(ref desc) = column.desc {
+        out.push_str(&format!(": {}", desc));
     }
+    let mut annotations = vec![format!("type: {}", column.data_type)];
+    if let Some(fk) = &column.foreign_key {
+        annotations.push(format!(
+            r#"foreign key: "{}"."{}""#,
+            fk.foreign_table, fk.foreign_column
+        ));
+    }
+    if let Some(enum_vs) = &column.enum_values {
+        let mut enum_v_strs = vec![];
+        for enum_v in enum_vs {
+            let mut str = format!("`{}`", enum_v.value);
+            if let Some(desc) = &enum_v.desc {
+                str.push_str(&format!(": {}", desc));
+            }
+            enum_v_strs.push(str);
+        }
+        let enum_v_str = enum_v_strs.join(", ");
+        annotations.push(format!("possible values: {}", enum_v_str));
+    }
+    out.push_str(&format!(" ({})", annotations.join(", ")));
+    out.push_str("\n");
+    out
 }
 
 impl ExecutionContext {
@@ -102,48 +87,29 @@ impl ExecutionContext {
         tool_call_id: &str,
         params: DescribeTablesParams,
     ) -> Result<ChatterMessage> {
-        let rows = self.client.query(r#"
-            SELECT
-                "table_name",
-                "metadata"->'data_item'->>'name' AS "name",
-                "metadata"->'data_page'->'metadata'->'fundamental'->>'内容' AS "description",
-                "metadata"->'data_page'->'metadata'->'fundamental'->>'データ形状' AS "data_shape",
-                jsonb_agg(
-                    jsonb_build_object(
-                        'attr_name', attr.value->>'name',
-                        'attr_description', attr.value->>'description',
-                        'attr_type', attr.value->>'attr_type',
-                        'attr_ref', attr.value->'ref'
-                    )
-                ) AS attributes
-            FROM datasets
-            CROSS JOIN LATERAL jsonb_each("metadata"->'data_page'->'metadata'->'attribute') AS attr(key, value)
-            WHERE "table_name" = ANY($1)
-            GROUP BY
-                "table_name",
-                "metadata"->'data_item'->>'name',
-                "metadata"->'data_page'->'metadata'->'fundamental'->>'内容',
-                "metadata"->'data_page'->'metadata'->'fundamental'->>'データ形状';
-        "#, &[&params.table_names]).await?;
+        let table_names: Vec<&str> = params.table_names.iter().map(|s| s.as_str()).collect();
+        let rows = km_to_sql::postgres::get(&self.client, &table_names).await?;
 
         let mut out = "".to_string();
-        for row in rows {
-            let table_name: String = row.get("table_name");
-            let name: String = row.get("name");
-            let description: String = row.get("description");
-            let data_shape: String = row.get("data_shape");
-            let mut table = format!(
-                "Table: `{}` (geom shape: {})\nDescription: {}\n{}\nAttributes:",
-                table_name, data_shape, name, description
-            )
-            .to_string();
-            let attributes: Json<Vec<DescribeTableAttribute>> = row.get("attributes");
-            if attributes.0.is_empty() {
-                table.push_str("\n- No attributes found. This table is empty. Do not use this table in your queries.");
+        for (table_name, metadata) in rows {
+            let mut table =
+                format!("Table: `{}` (for humans: {})\n", table_name, metadata.name).to_string();
+            if let Some(desc) = metadata.desc {
+                table.push_str(&format!("- Description: {}\n", desc));
             }
-            for attr in attributes.0 {
-                table.push_str(&format!("\n- {}", attr));
+            if let Some(pkey) = metadata.primary_key {
+                table.push_str(&format!("- Primary key: {}\n", pkey));
             }
+            if metadata.columns.is_empty() {
+                table.push_str("- No columns found. This table is empty. Do not use this table in your queries.\n");
+            } else {
+                table.push_str("- Columns:\n");
+                for column in metadata.columns {
+                    table.push_str(&format_column(&column));
+                }
+                table.push_str("\n");
+            }
+
             out.push_str(&table);
             out.push_str("\n\n");
         }

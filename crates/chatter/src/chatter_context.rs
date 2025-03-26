@@ -23,7 +23,7 @@ impl ChatterContext {
                 r#"
                     SELECT
                         "table_name",
-                        "metadata"->'data_item'->>'name' AS "name"
+                        "metadata"->>'name' AS "name"
                     FROM "datasets";
                 "#,
                 &[],
