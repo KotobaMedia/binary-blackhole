@@ -32,7 +32,7 @@ export const useQuery = (
   sql: string | undefined,
   config?: SWRConfiguration<QueryResponse, Error, BareFetcher<QueryResponse>>,
 ) => {
-  return useSWR(!!sql ? sql : null, queryFetcher, {
+  return useSWR(sql ? sql : null, queryFetcher, {
     revalidateOnFocus: false,
     ...config,
   });

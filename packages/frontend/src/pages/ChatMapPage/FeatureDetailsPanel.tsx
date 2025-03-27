@@ -37,7 +37,7 @@ const LayerTableView: React.FC<{
       allSelectedFeatures.filter((feature) => feature.layerName === layer.name),
     [allSelectedFeatures, layer.name],
   );
-  const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
+  // const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
   const rowSelection: RowSelectionState = useMemo(() => {
     const selected = selectedFeatures.reduce((acc, feature) => {
       const rowId = feature.feature.id?.toString();
@@ -53,7 +53,7 @@ const LayerTableView: React.FC<{
     (_updater) => {
       // TODO: Implement this
     },
-    [setSelectedFeatures],
+    [],
   );
   const { data: resp } = useQuery(layer.sql);
   const [data, columns] = useMemo(() => {

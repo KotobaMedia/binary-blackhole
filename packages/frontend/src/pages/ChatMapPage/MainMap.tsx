@@ -79,7 +79,7 @@ const MapLayer: React.FC<{
       );
     }
     if (resp?.data) {
-      let count = resp?.data.features.length;
+      const count = resp?.data.features.length;
       if (count === 0) {
         setLayers((prev) =>
           prev.map((l) =>
@@ -305,7 +305,7 @@ const MainMap: React.FC = () => {
         setSelectedFeatures([]);
       }
     },
-    [layers, setSelectedFeatures],
+    [layers, setDetailPaneVisible, setSelectedFeatures],
   );
 
   // Calculate merged bbox and fit map when bboxes change

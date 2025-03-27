@@ -2,7 +2,7 @@ import React, { JSX, useCallback, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { QuestionCircleFill } from "react-bootstrap-icons";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { format as formatSQL } from "sql-formatter";
 import { useLocation, useRoute } from "wouter";
 import { layersAtom, SQLLayer } from "./atoms";
@@ -182,6 +182,7 @@ const ChatBox: React.FC = () => {
   const apiUrl = import.meta.env.VITE_API_URL;
   const messageContainerRef = useRef<HTMLDivElement>(null);
 
+  const { mutate: globalMutate } = useSWRConfig();
   const {
     data: threadDetails,
     error,
@@ -193,6 +194,7 @@ const ChatBox: React.FC = () => {
   useEffect(() => {
     if (!threadId) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__archiveThread = async () => {
       if (threadDetails?.archived) {
         console.warn("Thread is already archived");
@@ -220,9 +222,10 @@ const ChatBox: React.FC = () => {
       }, false);
     };
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__archiveThread = undefined;
     };
-  }, [threadId]);
+  }, [threadId, mutate, threadDetails?.archived, apiUrl]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -251,8 +254,11 @@ const ChatBox: React.FC = () => {
 
           const data: CreateThreadResponse = await response.json();
           createdThreadId = data.thread_id;
+          // If we created a new thread, update the URL
+          setThreadId(createdThreadId);
         }
         if (!createdThreadId) throw new Error("Failed to create thread");
+        const mutateKey = `/threads/${createdThreadId}`;
 
         const messageStream = streamJsonLines<Message>(
           `/threads/${createdThreadId}/message`,
@@ -268,22 +274,24 @@ const ChatBox: React.FC = () => {
         );
         for await (const message of messageStream) {
           // Optimistically update the UI with the new message
-          mutate((prevData) => {
-            if (!prevData) return prevData;
-            const newMessages = [...prevData.messages, message];
-            return {
-              ...prevData,
-              messages: newMessages,
-            };
-          }, false);
+          // Note we use globalMutate because it could be a new thread, and the
+          // local mutate may not be available yet.
+          globalMutate<ThreadDetails>(
+            mutateKey,
+            (prevData) => {
+              if (!prevData) return prevData;
+              const newMessages = [...prevData.messages, message];
+              return {
+                ...prevData,
+                messages: newMessages,
+              };
+            },
+            false,
+          );
         }
 
-        if (createdThreadId !== threadId) {
-          // If we created a new thread, update the URL
-          setThreadId(createdThreadId);
-        }
         // After we get the last message, everything should be in sync, but we'll run a mutate just in case.
-        mutate();
+        globalMutate(mutateKey);
       } catch (error) {
         console.error("Error sending message:", error);
         // If there was an error, revalidate to restore the correct state
@@ -292,7 +300,7 @@ const ChatBox: React.FC = () => {
         setIsSending(false);
       }
     },
-    [threadId, setThreadId],
+    [threadId, globalMutate, apiUrl, setThreadId, mutate],
   );
 
   let messages: JSX.Element[] = [];
@@ -336,7 +344,7 @@ const ChatBox: React.FC = () => {
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  table: ({ node, ...props }) => (
+                  table: ({ node: _node, ...props }) => (
                     <table className="table" {...props} />
                   ),
                 }}

@@ -19,7 +19,7 @@ export const layersAtom = atom<SQLLayer[]>([]);
 
 /// This is the list of layers with previous versions removed.
 export const mergedLayersAtom = atom<SQLLayer[]>((get) => {
-  let allLayers = get(layersAtom);
+  const allLayers = get(layersAtom);
   const dedupedLayers = allLayers.reduce((acc: SQLLayer[], layer: SQLLayer) => {
     const existingLayerIdx = acc.findIndex((l) => l.name === layer.name);
     if (existingLayerIdx >= 0) {
