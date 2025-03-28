@@ -79,23 +79,59 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
   onSendMessage,
   isLoading,
 }) => {
-  const [message, setMessage] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Add effect to focus textarea when isLoading changes from true to false
+  useEffect(() => {
+    if (!isLoading && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isLoading]);
 
   const onSubmit = useCallback<React.FormEventHandler<HTMLFormElement>>(
     (e) => {
       e.preventDefault();
-      if (!message.trim() || isLoading) return;
+      if (!textareaRef.current || isLoading) return;
+
+      const message = textareaRef.current.value.trim();
+      if (!message) return;
 
       onSendMessage(message);
-      setMessage("");
-      // Reset the height of the textarea
-      const textarea = e.currentTarget.querySelector("textarea");
-      if (textarea) {
-        textarea.style.height = "auto";
-      }
+
+      // Clear and reset the textarea
+      textareaRef.current.value = "";
+      textareaRef.current.style.height = "auto";
     },
-    [message, onSendMessage, isLoading],
+    [onSendMessage, isLoading],
   );
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Don't intercept key events during IME composition
+    if (e.nativeEvent.isComposing || e.key === "Process") {
+      return;
+    }
+
+    if (e.key === "Enter") {
+      // Prevent submission when Shift is pressed (creating new line)
+      if (e.shiftKey) {
+        return;
+      }
+
+      e.preventDefault();
+
+      if (
+        textareaRef.current &&
+        textareaRef.current.value.trim() &&
+        !isLoading
+      ) {
+        // Call the form's submit handler to reuse the existing logic
+        const form = e.currentTarget.closest("form");
+        if (form) {
+          form.requestSubmit();
+        }
+      }
+    }
+  };
 
   const onInput = useCallback<React.FormEventHandler<HTMLTextAreaElement>>(
     (e) => {
@@ -113,34 +149,16 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
     [],
   );
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Check for Ctrl+Enter or Cmd+Enter (for Mac)
-    if (e.ctrlKey && e.key === "Enter") {
-      e.preventDefault();
-      if (message.trim() && !isLoading) {
-        onSendMessage(message);
-        setMessage("");
-        // Reset the height of the textarea
-        e.currentTarget.style.height = "auto";
-      }
-    }
-  };
-
   return (
     <form onSubmit={onSubmit}>
       <div className="input-group">
         <textarea
+          ref={textareaRef}
           className="form-control"
           placeholder="何を調べましょうか？"
           rows={1}
           style={{ overflow: "hidden", resize: "none", maxHeight: "150px" }}
           onInput={onInput}
-          value={message}
-          onChange={handleChange}
           onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
