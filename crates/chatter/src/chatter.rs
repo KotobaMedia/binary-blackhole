@@ -12,6 +12,7 @@ use async_openai::types::{
 use async_stream::try_stream;
 use futures::Stream;
 use geo_types::Geometry;
+use rust_decimal::Decimal;
 use std::{env, sync::Arc};
 use tokio_postgres::NoTls;
 
@@ -252,6 +253,11 @@ fn convert_column_value(
         "bool" => {
             let v: Option<bool> = row.get(index);
             v.map(serde_json::Value::Bool)
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "numeric" => {
+            let v: Option<Decimal> = row.get(index);
+            v.map(|v| serde_json::Value::String(v.to_string()))
                 .unwrap_or(serde_json::Value::Null)
         }
         // If the column is already in JSON format.

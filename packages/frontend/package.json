@@ -16,6 +16,7 @@
         "chroma-js": "^3.1.2",
         "classnames": "^2.5.1",
         "jotai": "^2.12.2",
+        "katex": "^0.16.21",
         "maplibre-gl": "^5.2.0",
         "react": "^19.0.0",
         "react-bootstrap": "^2.10.9",
@@ -23,7 +24,9 @@
         "react-dom": "^19.0.0",
         "react-map-gl": "^8.0.1",
         "react-markdown": "^10.1.0",
+        "rehype-katex": "^7.0.1",
         "remark-gfm": "^4.0.1",
+        "remark-math": "^6.0.0",
         "sql-formatter": "^15.4.11",
         "swr": "^2.3.3",
         "wouter": "^3.6.0"

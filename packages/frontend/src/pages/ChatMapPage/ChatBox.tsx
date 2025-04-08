@@ -1,6 +1,8 @@
 import React, { JSX, useCallback, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { QuestionCircleFill } from "react-bootstrap-icons";
 import useSWR, { useSWRConfig } from "swr";
 import { format as formatSQL } from "sql-formatter";
@@ -360,7 +362,8 @@ const ChatBox: React.FC = () => {
           return (
             <AssistantMessage key={message.id}>
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   table: ({ node: _node, ...props }) => (
                     <table className="table" {...props} />

@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use tokio_postgres::Row;
 
 use crate::geom::GeometryWrapper;
@@ -19,6 +20,7 @@ fn col_to_string(row: &tokio_postgres::Row, col: usize) -> String {
     try_get_as_string!(row, col, f64);
     try_get_as_string!(row, col, bool);
     try_get_as_string!(row, col, GeometryWrapper);
+    try_get_as_string!(row, col, Decimal);
 
     // Fallback: use debug formatting.
     "unsupported".to_string()
