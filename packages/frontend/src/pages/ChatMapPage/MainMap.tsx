@@ -10,7 +10,6 @@ import Maplibre, {
   Layer,
   MapRef,
   MapLayerMouseEvent,
-  StyleSpecification,
 } from "react-map-gl/maplibre";
 import {
   layersAtom,
@@ -21,7 +20,6 @@ import {
   mergedLayersAtom,
 } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import MainMapStyle from "./MainMapStyle.json";
 import chroma from "chroma-js";
 import { BBox, useQuery } from "../../tools/query";
 
@@ -357,7 +355,7 @@ const MainMap: React.FC = () => {
   return (
     <Maplibre
       ref={mapRef}
-      mapStyle={MainMapStyle as StyleSpecification}
+      mapStyle={"https://tiles.kmproj.com/styles/osm-en-white.json"}
       initialViewState={{
         longitude: 135,
         latitude: 37,
