@@ -24,7 +24,6 @@ import {
   ArrowsExpandVertical,
   X,
 } from "react-bootstrap-icons";
-import { useQuery } from "../../tools/query";
 import "./table.scss";
 import { Form } from "react-bootstrap";
 
@@ -55,12 +54,12 @@ const LayerTableView: React.FC<{
     },
     [],
   );
-  const { data: resp } = useQuery(layer.sql);
+  // const { data: resp } = useQuery(layer.sql);
   const [data, columns] = useMemo(() => {
-    if (!resp || resp.data.features.length === 0) {
-      return [[], []];
-    }
-    const features = resp.data.features;
+    // if (!resp || resp.data.features.length === 0) {
+    return [[], []];
+    // }
+    const features: GeoJSON.Feature[] = []; // resp.data.features;
     const columnHelper = createColumnHelper<GeoJSON.Feature>();
     let columns: ColumnDef<GeoJSON.Feature>[] = [
       {
@@ -91,7 +90,7 @@ const LayerTableView: React.FC<{
         ),
     );
     return [features, columns];
-  }, [resp]);
+  }, []);
 
   useEffect(() => {
     // Scroll the selected row in to view if it is not visible

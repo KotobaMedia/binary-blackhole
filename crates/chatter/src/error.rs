@@ -24,6 +24,9 @@ pub enum ChatterError {
 
     #[error("ToSQL Error: {0}")]
     ToSQLError(#[from] km_to_sql::error::Error),
+
+    #[error("SQL Query Error: {0}")]
+    QueryError(String),
 }
 
 pub type Result<T> = std::result::Result<T, ChatterError>;

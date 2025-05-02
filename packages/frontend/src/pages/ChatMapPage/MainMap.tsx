@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Maplibre, {
   Source,
   Layer,
@@ -21,7 +15,7 @@ import {
 } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import chroma from "chroma-js";
-import { BBox, useQuery } from "../../tools/query";
+import { BBox, useQueryMetadata } from "../../tools/query";
 
 // Function to generate a deterministic color based on layer name
 const getLayerColor = (layerName: string) => {
@@ -60,13 +54,13 @@ const MapLayer: React.FC<{
   layer: SQLLayer;
   onBboxChange: (name: string, bbox: BBox | undefined) => void;
 }> = ({ layer, onBboxChange }) => {
-  const { data: resp, error } = useQuery(layer.sql);
+  const { data: resp, error } = useQueryMetadata(layer.sql);
   const setLayers = useSetAtom(layersAtom);
 
   useEffect(() => {
     // Update the parent component with this layer's bbox when it changes
-    onBboxChange(layer.name, resp?.bbox);
-  }, [resp?.bbox, layer.name, onBboxChange]);
+    onBboxChange(layer.name, resp?.bounds);
+  }, [resp?.bounds, layer.name, onBboxChange]);
 
   useEffect(() => {
     if (error) {
@@ -76,49 +70,24 @@ const MapLayer: React.FC<{
         ),
       );
     }
-    if (resp?.data) {
-      const count = resp?.data.features.length;
-      if (count === 0) {
-        setLayers((prev) =>
-          prev.map((l) =>
-            l.name === layer.name ? { ...l, error: "No features found" } : l,
-          ),
-        );
-      }
-    }
-  }, [resp?.data, error, layer.name, setLayers]);
-
-  const featureCollection = useMemo<GeoJSON.FeatureCollection | null>(() => {
-    const data = resp?.data;
-    if (!data) return null;
-    return {
-      type: "FeatureCollection",
-      features: data.features.map((feature, idx) => ({
-        id: feature.id ?? feature.properties?._id ?? idx,
-        ...feature,
-        properties: {
-          ...feature.properties,
-        },
-      })),
-    };
-  }, [resp?.data]);
+  }, [error, layer.name, setLayers]);
 
   if (error) {
     console.error(`Error loading layer ${layer.name}:`, error);
     return <></>;
   }
-  if (!resp || !featureCollection) return <></>;
-  if (featureCollection.features.length === 0) return <></>;
+  if (!resp) return <></>;
 
   const sourceId = `source-${layer.name}`;
   const layerColor = getLayerColor(layer.name);
 
   return (
-    <Source id={sourceId} type="geojson" data={featureCollection}>
+    <Source id={sourceId} type="vector" {...resp}>
       {/* Point layer */}
       <Layer
         id={`${layer.name}/point`}
         source={sourceId}
+        source-layer="data"
         type="circle"
         filter={["==", ["geometry-type"], "Point"]}
         paint={{
@@ -134,6 +103,7 @@ const MapLayer: React.FC<{
       <Layer
         id={`${layer.name}/line`}
         source={sourceId}
+        source-layer="data"
         type="line"
         filter={["==", ["geometry-type"], "LineString"]}
         paint={{
@@ -147,6 +117,7 @@ const MapLayer: React.FC<{
       <Layer
         id={`${layer.name}/polygon-fill`}
         source={sourceId}
+        source-layer="data"
         type="fill"
         filter={["==", ["geometry-type"], "Polygon"]}
         paint={{
@@ -159,6 +130,7 @@ const MapLayer: React.FC<{
       <Layer
         id={`${layer.name}/polygon-outline`}
         source={sourceId}
+        source-layer="data"
         type="line"
         filter={["==", ["geometry-type"], "Polygon"]}
         paint={{
@@ -172,6 +144,7 @@ const MapLayer: React.FC<{
       <Layer
         id={`${layer.name}/point-selected-outline`}
         source={sourceId}
+        source-layer="data"
         type="circle"
         filter={["==", ["geometry-type"], "Point"]}
         paint={{
@@ -192,6 +165,7 @@ const MapLayer: React.FC<{
       <Layer
         id={`${layer.name}/line-selected-outline`}
         source={sourceId}
+        source-layer="data"
         type="line"
         filter={["==", ["geometry-type"], "LineString"]}
         paint={{
@@ -210,6 +184,7 @@ const MapLayer: React.FC<{
       <Layer
         id={`${layer.name}/polygon-selected-outline`}
         source={sourceId}
+        source-layer="data"
         type="line"
         filter={["==", ["geometry-type"], "Polygon"]}
         paint={{

@@ -210,6 +210,115 @@ impl Chatter {
         }
         Ok(results)
     }
+
+    /// Execute a SQL query for a given XYZ tile and return the result as a MVT binary.
+    /// Note: the query's geometry column must be named "geom" and the ID column must be named "ogc_fid".
+    pub async fn get_tile(&mut self, query: &str, z: i32, x: i32, y: i32) -> Result<Vec<u8>> {
+        let stmt = self.pg_client.prepare(query).await?;
+        let columns = stmt.columns();
+        // get the first column from the query -- that will be our ID column
+        let id_column = columns.get(0).ok_or_else(|| {
+            ChatterError::QueryError("No columns found in the query result.".to_string())
+        })?;
+        let id_column_name = id_column.name();
+        let geom_column = columns
+            .iter()
+            .find(|col| col.type_().name() == "geometry")
+            .ok_or_else(|| {
+                ChatterError::QueryError(
+                    "No geometry column found in the query result.".to_string(),
+                )
+            })?;
+        let geom_column_name = geom_column.name();
+
+        let query = format!(
+            r#"
+                WITH
+                -- 1) tile coords + both envelopes
+                params AS (
+                SELECT
+                    $1::int   AS z,
+                    $2::int   AS x,
+                    $3::int   AS y,
+                    -- WebMercator envelope for MVT‐packing
+                    ST_TileEnvelope($1, $2, $3)                            AS env_3857,
+                    -- tile envelope reprojected once into 4326 for indexed intersection
+                    ST_Transform(
+                    ST_TileEnvelope($1, $2, $3),
+                    4326
+                    )                                                       AS env_4326
+                ),
+
+                -- 2) your auto‐generated subquery goes here
+                source AS (
+                    {query}
+                ),
+
+                -- 3) only intersect in 4326 (uses index on source.geom), then reproject+clip
+                tile_raw AS (
+                SELECT
+                    "{id_column_name}",
+                    ST_AsMVTGeom(
+                        ST_Transform("source"."{geom_column_name}", 3857),
+                        params.env_3857,
+                        4096,
+                        256,
+                        TRUE
+                    ) AS geom
+                FROM source
+                CROSS JOIN params
+                WHERE
+                    source."{geom_column_name}" && params.env_4326
+                )
+
+                -- 4) pack into an MVT blob
+                SELECT
+                ST_AsMVT(
+                    tile,
+                    'data',
+                    4096,
+                    'geom',
+                    '{id_column_name}'
+                ) AS mvt_tile
+                FROM (
+                    SELECT * FROM tile_raw
+                ) AS tile;
+            "#,
+        );
+
+        let result = self.pg_client.query_one(&query, &[&z, &x, &y]).await?;
+        let mvt_tile: Option<Vec<u8>> = result.get(0);
+
+        mvt_tile.ok_or_else(|| {
+            ChatterError::QueryError("No MVT tile found for the given query.".to_string())
+        })
+    }
+
+    pub async fn get_query_bbox(&mut self, input_query: &str) -> Result<[f64; 4]> {
+        let query = format!(
+            r#"
+                WITH
+                source AS (
+                    {input_query}
+                )
+                SELECT
+                    ST_XMin(extent) AS minx,
+                    ST_YMin(extent) AS miny,
+                    ST_XMax(extent) AS maxx,
+                    ST_YMax(extent) AS maxy
+                FROM (
+                    SELECT ST_Extent(source.geom) AS extent FROM source
+                ) AS agg;
+            "#,
+        );
+        let result = self.pg_client.query_one(&query, &[]).await?;
+        let minx: f64 = result.get(0);
+        let miny: f64 = result.get(1);
+        let maxx: f64 = result.get(2);
+        let maxy: f64 = result.get(3);
+
+        Ok([minx, miny, maxx, maxy])
+    }
 }
 
 // Helper function to convert a column value to serde_json::Value based on its type.
