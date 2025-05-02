@@ -147,6 +147,7 @@ dependencies = [
  "tokio-stream",
  "tower-http",
  "ulid",
+ "urlencoding",
 ]
 
 [[package]]

@@ -1,10 +1,16 @@
 use crate::error::Result;
 use crate::state::AppState;
 use anyhow::Context;
-use axum::{Json, Router, extract::State, routing::post};
+use axum::{
+    Json, Router,
+    extract::{Path, Query, State},
+    http::{HeaderMap, StatusCode, header},
+    response::{IntoResponse, Response},
+    routing::{get, post},
+};
 use geo::{BoundingRect, Geometry, GeometryCollection};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 #[derive(Deserialize)]
 struct PostQueryRequest {
@@ -54,6 +60,61 @@ async fn post_query_handler(
     Ok(Json(PostQueryResponse { data: fc, bbox }))
 }
 
+#[derive(Deserialize)]
+struct GetTileQuery {
+    q: String,
+}
+
+async fn get_tile_metadata_handler(
+    State(state): State<AppState>,
+    Query(query): Query<GetTileQuery>,
+) -> Result<Json<serde_json::Value>> {
+    let mut chatter = state.chatter.lock().await;
+
+    let bbox = chatter
+        .get_query_bbox(&query.q)
+        .await
+        .with_context(|| format!("when executing query: {}", &query.q))?;
+
+    let escaped_q = urlencoding::encode(&query.q);
+
+    Ok(Json(json!({
+        "tilejson": "3.0.0",
+        "scheme": "xyz",
+        "tiles": [
+            format!("http://localhost:9000/tile/{{z}}/{{x}}/{{y}}?q={}", escaped_q),
+        ],
+        "bounds": bbox,
+        "minzoom": 0,
+        "maxzoom": 18,
+    })))
+}
+
+async fn get_tile_handler(
+    State(state): State<AppState>,
+    Path((z, x, y)): Path<(i32, i32, i32)>,
+    Query(query): Query<GetTileQuery>,
+) -> Result<Response> {
+    let mut chatter = state.chatter.lock().await;
+
+    let tile = chatter
+        .get_tile(&query.q, z, x, y)
+        .await
+        .with_context(|| format!("when getting tile: z={}, x={}, y={}", z, x, y))?;
+
+    // Create a response with the appropriate content type
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        "application/x-protobuf".parse().unwrap(),
+    );
+
+    Ok((StatusCode::OK, headers, tile).into_response())
+}
+
 pub fn query_routes() -> Router<AppState> {
-    Router::new().route("/query", post(post_query_handler))
+    Router::new()
+        .route("/query", post(post_query_handler))
+        .route("/tile.json", get(get_tile_metadata_handler))
+        .route("/tile/{z}/{x}/{y}", get(get_tile_handler))
 }
