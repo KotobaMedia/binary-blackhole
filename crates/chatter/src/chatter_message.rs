@@ -9,13 +9,20 @@ use serde::{Deserialize, Serialize};
 
 pub type Role = OpenAIRole;
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SQLExecutionDetails {
+    pub id: String,
+    pub name: String,
+    pub sql: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum ChatterMessageSidecar {
     #[default]
     None,
 
-    /// Execute some SQL. (name, SQL query)
-    SQLExecution((String, String)),
+    /// Execute some SQL. (Query ID, name, SQL query)
+    SQLExecution(SQLExecutionDetails),
     /// A failed SQL execution.
     SQLExecutionError,
 

@@ -27,7 +27,7 @@ Frontend on [http://localhost:5173](http://localhost:5173) and backend on :9000.
 
 # License
 
-If the AGPL is not appropriate for your use case, a commercial license is available by request. [Contact me if you're interested.](mailto:keita@kotobamedia.com)
+If the AGPL is not appropriate for your use case, a commercial license is available by request. [Contact me if you're interested.](https://kotobamedia.com/contact/)
 
 Copyright © 2025 KotobaMedia
 

@@ -35,5 +35,4 @@ You currently only have access to table names. Use the `describe_tables` tool on
 - Use `DISTINCT` or `GROUP BY` to handle duplicates, including within subqueries.
 - Spatial operations must strictly use `ST_DistanceSpheroid` and correct spatial joins.
 - Administrative codes must always be validated using the `admini_boundary_cd` table.
-- Maintain geometry column conventions (`geom`) for all spatial output.
 - Always include a `geom` column in query outputs; clarify with the user if uncertain.

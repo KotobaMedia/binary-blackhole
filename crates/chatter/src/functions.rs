@@ -1,5 +1,6 @@
 //! LLM functions that will be called by the LLM runtime.
 
+use crate::chatter_message::SQLExecutionDetails;
 use crate::rows_to_tsv::{has_geometry_column, rows_to_tsv};
 use crate::{
     chatter_message::{ChatterMessage, ChatterMessageSidecar},
@@ -29,6 +30,9 @@ pub struct DescribeTablesParams {
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 pub struct QueryDatabaseParams {
+    /// The ID of the query. When updating or revising a query, provide the ID of the query you want to update.
+    query_id: Option<String>,
+
     /// The name this query will be referred to as. This will be shown to the user. It must be short and descriptive.
     name: String,
 
@@ -128,7 +132,7 @@ impl ExecutionContext {
         let parameters_schema = json!(schema_for!(QueryDatabaseParams));
         FunctionObject {
             name: "query_database".into(),
-            description: Some("Query the database and show results to the user. You will have access to a limited subset of the output.\nIf the query is not correct, an error message will be returned.\nIf an error is returned, rewrite the query and try again.\nIf the result set is empty, try again.".into()),
+            description: Some("Query the database and show results to the user. You will have access to a limited subset of the output.\nIf the query is not correct, an error message will be returned.\nIf an error is returned, rewrite the query and try again.\nIf the result set is empty, try again.\nWhen updating previous queries, provide the `query_id` parameter with the ID of the query you are updating.".into()),
             parameters: Some(parameters_schema),
             strict: Some(true),
         }
@@ -147,6 +151,9 @@ impl ExecutionContext {
         params: QueryDatabaseParams,
     ) -> Result<ChatterMessage> {
         let query = params.query.trim_end_matches(';');
+        let query_id = params
+            .query_id
+            .unwrap_or_else(|| ulid::Ulid::new().to_string());
 
         let sample_size = 5;
         let explain_query = format!(
@@ -214,7 +221,11 @@ impl ExecutionContext {
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
-                    sidecar: ChatterMessageSidecar::SQLExecution((params.name, query.to_string())),
+                    sidecar: ChatterMessageSidecar::SQLExecution(SQLExecutionDetails {
+                        id: query_id,
+                        name: params.name,
+                        sql: query.to_string(),
+                    }),
                 });
             }
             Err(e) => {
