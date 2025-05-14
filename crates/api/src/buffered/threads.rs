@@ -12,9 +12,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use chatter::data::types::chat_message::ChatMessage;
+use chatter::data::types::chat_thread::{ChatThread, ChatThreadBuilder};
 use chrono::Utc;
-use data::types::chat_message::ChatMessage;
-use data::types::chat_thread::{ChatThread, ChatThreadBuilder};
 use serde::Serialize;
 use ulid::Ulid;
 

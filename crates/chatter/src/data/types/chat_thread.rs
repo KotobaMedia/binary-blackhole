@@ -1,6 +1,6 @@
-use crate::error::Result;
-use crate::migrations::{Migratable, Migrator};
-use crate::{dynamodb::Db, error::DataError};
+use crate::data::error::Result;
+use crate::data::migrations::{Migratable, Migrator};
+use crate::data::{dynamodb::Db, error::DataError};
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::{AttributeValue, ReturnValue};
 use chrono::{DateTime, Utc};

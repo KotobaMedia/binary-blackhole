@@ -1,6 +1,6 @@
 use chatter::chatter_message::{ChatterMessage, ChatterMessageSidecar, Role};
-use data::types::chat_message::ChatMessage;
-use data::types::chat_thread::ChatThread;
+use chatter::data::types::chat_message::ChatMessage;
+use chatter::data::types::chat_thread::ChatThread;
 use serde::Serialize;
 
 #[derive(Serialize)]

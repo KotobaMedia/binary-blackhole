@@ -1,4 +1,4 @@
-use crate::dynamodb::Db;
+use crate::data::dynamodb::Db;
 use aws_sdk_dynamodb::types::{
     AttributeDefinition, KeySchemaElement, KeyType, ProvisionedThroughput, ScalarAttributeType,
 };

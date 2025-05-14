@@ -13,8 +13,8 @@ use axum::{
 };
 use chatter::chatter_context::ChatterContext;
 use chatter::chatter_message::Role;
-use data::types::chat_message::{ChatMessage, ChatMessageBuilder};
-use data::types::chat_thread::ChatThread;
+use chatter::data::types::chat_message::{ChatMessage, ChatMessageBuilder};
+use chatter::data::types::chat_thread::ChatThread;
 use futures::{StreamExt, future};
 use serde::Deserialize;
 use serde_json::json;

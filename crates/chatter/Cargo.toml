@@ -24,3 +24,10 @@ tokio-postgres = { version = "0.7", features = ["with-geo-types-0_7", "with-serd
 tokio-stream = { version = "0.1.17" }
 ulid = "1.2.0"
 wkb = "0.8.0"
+
+# used in data/
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-dynamodb = "1"
+serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
+chrono = { version = "0.4.40", features = ["serde"] }
+async-trait = "0.1.87"

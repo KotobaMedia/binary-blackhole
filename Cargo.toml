@@ -6,5 +6,5 @@ package.authors = [
   "Keitaroh Kobayashi <keita@kotobamedia.com>"
 ]
 members = [
-  "crates/api", "crates/chatter", "crates/cli", "crates/data",
+  "crates/api", "crates/chatter",
 ]

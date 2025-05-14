@@ -1,5 +1,5 @@
 use chatter::chatter::Chatter;
-use data::dynamodb::Db;
+use chatter::data::dynamodb::Db;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

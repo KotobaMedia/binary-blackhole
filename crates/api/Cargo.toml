@@ -15,7 +15,6 @@ path = "src/main_streaming.rs"
 required-features = ["streaming"]
 
 [dependencies]
-data = { path = "../data" }
 chatter = { path = "../chatter" }
 
 lambda_http = { version = "0.13.0", default-features = false, features = ["apigw_http", "tracing"] }
