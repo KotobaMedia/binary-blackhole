@@ -1,6 +1,7 @@
 //! LLM functions that will be called by the LLM runtime.
 
 use crate::chatter_message::SQLExecutionDetails;
+use crate::data::dynamodb::Db;
 use crate::rows_to_tsv::{has_geometry_column, rows_to_tsv};
 use crate::{
     chatter_message::{ChatterMessage, ChatterMessageSidecar},
@@ -18,7 +19,8 @@ use std::sync::Arc;
 #[derive(Builder, Clone)]
 #[builder(pattern = "owned")]
 pub struct ExecutionContext {
-    client: Arc<tokio_postgres::Client>,
+    pg: Arc<tokio_postgres::Client>,
+    ddb: Arc<Db>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -93,7 +95,7 @@ impl ExecutionContext {
         params: DescribeTablesParams,
     ) -> Result<ChatterMessage> {
         let table_names: Vec<&str> = params.table_names.iter().map(|s| s.as_str()).collect();
-        let rows = km_to_sql::postgres::get(&self.client, &table_names).await?;
+        let rows = km_to_sql::postgres::get(&self.pg, &table_names).await?;
 
         let mut out = "".to_string();
         for (table_name, metadata) in rows {
@@ -176,7 +178,7 @@ impl ExecutionContext {
             "#,
             query, sample_size,
         );
-        let result = self.client.query(&explain_query, &[]).await;
+        let result = self.pg.query(&explain_query, &[]).await;
 
         match result {
             Ok(rows) => {

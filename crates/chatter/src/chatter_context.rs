@@ -5,6 +5,11 @@ use ulid::Ulid;
 
 use crate::{chatter_message::ChatterMessage, functions::ExecutionContext};
 
+/// A context is a collection of messages and tools that are used to interact with the LLM.
+/// It is used to track the conversation history and the tools that are available to the LLM.
+/// The context is created when a user starts a new conversation.
+///
+/// TODO: Refactor this so instead of taking in a client, the system message is passed in as a parameter, decoupling it from this struct.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChatterContext {
     /// A unique identifier for this context. Use this to track context and conversation history.

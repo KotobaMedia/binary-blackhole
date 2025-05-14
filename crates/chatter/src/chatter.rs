@@ -25,6 +25,7 @@ pub struct QueryResultRow {
 pub struct Chatter {
     pub context: ChatterContext,
     pub client: async_openai::Client<async_openai::config::OpenAIConfig>,
+    pub ddb_client: Arc<crate::data::dynamodb::Db>,
     pub pg_client: Arc<tokio_postgres::Client>,
 
     func_ctx: ExecutionContext,
@@ -33,8 +34,8 @@ pub struct Chatter {
 impl Chatter {
     pub async fn new() -> Result<Self> {
         let config = env::var("POSTGRES_CONN_STR")?;
-        let (client, connection) = tokio_postgres::connect(&config, NoTls).await?;
-        let client = Arc::new(client);
+        let (pg_client, connection) = tokio_postgres::connect(&config, NoTls).await?;
+        let pg_client = Arc::new(pg_client);
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -42,18 +43,22 @@ impl Chatter {
             }
         });
 
-        client
+        pg_client
             .batch_execute("SET statement_timeout = 10000")
             .await?;
 
+        let ddb_client = Arc::new(crate::data::dynamodb::Db::new().await);
+
         let func_ctx = ExecutionContextBuilder::default()
-            .client(client.clone())
+            .pg(pg_client.clone())
+            .ddb(ddb_client.clone())
             .build()?;
 
         Ok(Self {
-            context: ChatterContext::new(&client).await?,
+            context: ChatterContext::new(&pg_client).await?,
             client: async_openai::Client::new(),
-            pg_client: client,
+            pg_client,
+            ddb_client,
             func_ctx,
         })
     }
@@ -68,29 +73,6 @@ impl Chatter {
     /// Switch the internal context with an already instantiated ChatterContext.
     pub fn switch_context(&mut self, context: ChatterContext) {
         self.context = context;
-    }
-
-    #[deprecated]
-    pub async fn execute(&mut self) -> Result<ChatCompletionResponseMessage> {
-        loop {
-            let message = self.create_and_send_request().await?;
-
-            // Add the AI response to the context
-            self.context.add_message(message.clone().try_into()?);
-
-            if let Some(tool_calls) = message.tool_calls {
-                // Execute the tool call and get the response message
-                let tool_response = self.execute_tool_call(tool_calls[0].clone()).await?;
-
-                // Add the tool response to the context
-                self.context.add_message(tool_response);
-
-                // Continue the loop to process the next message
-            } else {
-                // No tool call, we're done
-                return Ok(message);
-            }
-        }
     }
 
     pub fn execute_stream(mut self) -> impl Stream<Item = Result<ChatterMessage>> {
