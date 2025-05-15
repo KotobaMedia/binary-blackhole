@@ -41,7 +41,7 @@ async fn post_query_handler(
     for row in rows {
         let mut feature = geojson::Feature::default();
         feature.geometry = Some((&row.geom).into());
-        geometries.push(Geometry::from(row.geom));
+        geometries.push(row.geom);
         if let Value::Object(props) = row.properties {
             if let Some(id) = props.get("_id") {
                 feature.id = Some(geojson::feature::Id::String(id.to_string()));

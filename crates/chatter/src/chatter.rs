@@ -143,12 +143,12 @@ impl Chatter {
             "describe_tables" => {
                 let args = serde_json::from_str(&call.arguments)?;
                 let response = self.func_ctx.describe_tables(&id, args).await?;
-                Ok(response.into())
+                Ok(response)
             }
             "query_database" => {
                 let args = serde_json::from_str(&call.arguments)?;
                 let response = self.func_ctx.query_database(&id, args).await?;
-                Ok(response.into())
+                Ok(response)
             }
             other => Err(crate::error::ChatterError::UnknownToolCall(
                 other.to_string(),
@@ -199,7 +199,7 @@ impl Chatter {
         let stmt = self.pg_client.prepare(query).await?;
         let columns = stmt.columns();
         // get the first column from the query -- that will be our ID column
-        let id_column = columns.get(0).ok_or_else(|| {
+        let id_column = columns.first().ok_or_else(|| {
             ChatterError::QueryError("No columns found in the query result.".to_string())
         })?;
         let id_column_name = id_column.name();

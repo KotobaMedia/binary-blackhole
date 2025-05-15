@@ -73,7 +73,7 @@ impl ChatMessage {
         // Convert DynamoDB items to ChatMessage structs
         let messages = items
             .into_iter()
-            .map(|item| serde_dynamo::from_item(item))
+            .map(serde_dynamo::from_item)
             .collect::<std::result::Result<Vec<Self>, _>>()?;
 
         Ok(messages)

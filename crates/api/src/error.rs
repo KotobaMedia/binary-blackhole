@@ -1,5 +1,4 @@
 use axum::{
-    body::Body,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -7,7 +6,7 @@ use axum::{
 use futures::stream;
 use lambda_http::tracing;
 use serde_json::json;
-use std::{convert::Infallible, fmt};
+use std::fmt;
 
 pub type Result<T> = std::result::Result<T, AppError>;
 

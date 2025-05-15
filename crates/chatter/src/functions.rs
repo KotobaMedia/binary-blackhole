@@ -69,7 +69,7 @@ fn format_column(column: &ColumnMetadata) -> String {
         annotations.push(format!("possible values: {}", enum_v_str));
     }
     out.push_str(&format!(" ({})", annotations.join(", ")));
-    out.push_str("\n");
+    out.push('\n');
     out
 }
 
@@ -116,7 +116,7 @@ impl ExecutionContext {
                 for column in metadata.columns {
                     table.push_str(&format_column(&column));
                 }
-                table.push_str("\n");
+                table.push('\n');
             }
 
             out.push_str(&table);

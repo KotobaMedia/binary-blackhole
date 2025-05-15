@@ -39,8 +39,8 @@ impl Db {
                 .await;
             return config;
         }
-        let config = aws_config::load_from_env().await;
-        config
+        
+        aws_config::load_from_env().await
     }
 
     /// Creates a new `Db` by loading AWS config from the environment and reading TABLE_NAME.
@@ -53,7 +53,7 @@ impl Db {
 
         // Initialize the database if in dev/test environments and the endpoint override is set. When we're connecting to AWS DynamoDB, we don't want to initialize the database, but we do if we're connecting to a local DynamoDB instance.
         #[cfg(any(debug_assertions, test))]
-        if let Some(_) = get_endpoint_url() {
+        if get_endpoint_url().is_some() {
             db.init_schema().await;
         }
 
@@ -103,8 +103,7 @@ impl Db {
             .await
             .map_err(|err| {
                 if let Some(true) = err
-                    .as_service_error()
-                    .and_then(|se| Some(se.is_conditional_check_failed_exception()))
+                    .as_service_error().map(|se| se.is_conditional_check_failed_exception())
                 {
                     return DataError::OptimisticLockFailed;
                 }
@@ -181,7 +180,7 @@ impl Db {
     where
         T: Migratable + std::marker::Send,
     {
-        T::migrate_and_parse(&self, item).await
+        T::migrate_and_parse(self, item).await
     }
 }
 
@@ -263,7 +262,7 @@ mod tests {
             .user_id("user123".to_string())
             .id("thread456".to_string())
             .title("Test Thread".to_string())
-            .modified_ts(original_ts.clone())
+            .modified_ts(original_ts)
             .archived(Some(false))
             .build()
             .expect("Failed building ChatThread");
