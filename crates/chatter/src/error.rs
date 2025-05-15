@@ -27,6 +27,8 @@ pub enum ChatterError {
 
     #[error("SQL Query Error: {0}")]
     QueryError(String),
+    #[error("SQL query creation error: {0}")]
+    SqlQueryCreationError(String),
 }
 
 pub type Result<T> = std::result::Result<T, ChatterError>;

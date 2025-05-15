@@ -5,4 +5,5 @@ pub mod data;
 pub mod error;
 mod functions;
 pub mod geom;
+mod pg_helpers;
 mod rows_to_tsv;

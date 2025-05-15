@@ -2,7 +2,9 @@
 
 use crate::chatter_message::SQLExecutionDetails;
 use crate::data::dynamodb::Db;
-use crate::rows_to_tsv::{has_geometry_column, rows_to_tsv};
+use crate::data::types::sql_query::SqlQueryBuilder;
+use crate::pg_helpers::{check_query, validate_query_rows};
+use crate::rows_to_tsv::rows_to_tsv;
 use crate::{
     chatter_message::{ChatterMessage, ChatterMessageSidecar},
     error::Result,
@@ -158,59 +160,43 @@ impl ExecutionContext {
             .unwrap_or_else(|| ulid::Ulid::new().to_string());
 
         let sample_size = 5;
-        let explain_query = format!(
-            r#"
-            WITH numbered AS (
-                SELECT row_number() OVER () AS __rn, t.*
-                FROM ({}) AS t
-            ), total AS (
-                SELECT count(*) AS cnt FROM numbered
-            ), random_indices AS (
-                SELECT floor(random() * cnt)::int + 1 as __rn
-                FROM total, generate_series(1, {})
-            )
-            SELECT *
-            FROM numbered
-            WHERE __rn IN (
-                SELECT __rn FROM random_indices
-            )
-            ORDER BY __rn;
-            "#,
-            query, sample_size,
-        );
-        let result = self.pg.query(&explain_query, &[]).await;
+        // Call the helper to check the query.
+        let result = check_query(&self.pg, query, sample_size).await;
 
         match result {
             Ok(rows) => {
-                if rows.len() == 0 {
+                if let Err(validation_error) = validate_query_rows(&rows) {
                     return Ok(ChatterMessage {
-                        message: Some(
-                            "Failed to execute query: The result set is empty. Try again."
-                                .to_string(),
-                        ),
+                        message: Some(validation_error.to_string()),
                         role: Role::Tool,
                         tool_calls: None,
                         tool_call_id: Some(tool_call_id.into()),
                         sidecar: ChatterMessageSidecar::SQLExecutionError,
                     });
                 }
-
-                if !has_geometry_column(&rows[0]) {
-                    return Ok(ChatterMessage {
-                        message: Some(
-                            "Failed to execute query: `geom` column was not in the result set."
-                                .to_string(),
-                        ),
-                        role: Role::Tool,
-                        tool_calls: None,
-                        tool_call_id: Some(tool_call_id.into()),
-                        sidecar: ChatterMessageSidecar::SQLExecutionError,
-                    });
+                {
+                    use chrono::Utc;
+                    let now = Utc::now();
+                    let mut builder = SqlQueryBuilder::default();
+                    builder
+                        .thread_id("default".to_string())
+                        .query_id(ulid::Ulid::new().to_string())
+                        .query_name(params.name.clone())
+                        .query_content(query.to_string())
+                        .created_ts(now)
+                        .modified_ts(now)
+                        .accessed_ts(now);
+                    let sql_query = builder.build().map_err(|e| {
+                        crate::error::ChatterError::SqlQueryCreationError(e.to_string())
+                    })?;
+                    self.ddb.put_item(&sql_query).await.map_err(|e| {
+                        crate::error::ChatterError::SqlQueryCreationError(e.to_string())
+                    })?;
                 }
 
                 let tsv = rows_to_tsv(&rows);
                 println!("SQL [{}]: {}", params.name, &query);
-                return Ok(ChatterMessage {
+                Ok(ChatterMessage {
                     message: Some(format!(
                         indoc! {"
                             Sample of result:
@@ -228,32 +214,17 @@ impl ExecutionContext {
                         name: params.name,
                         sql: query.to_string(),
                     }),
-                });
+                })
             }
             Err(e) => {
-                let message = if let Some(db_error) = e.as_db_error() {
-                    format!(
-                        "Failed to execute query: {}{}{}",
-                        db_error.message(),
-                        db_error
-                            .where_()
-                            .map(|where_| format!(", where: {}", where_))
-                            .unwrap_or_default(),
-                        db_error
-                            .hint()
-                            .map(|hint| format!(", hint: {}", hint))
-                            .unwrap_or_default()
-                    )
-                } else {
-                    format!("Failed to execute query: {}", e)
-                };
-                return Ok(ChatterMessage {
+                let message = crate::pg_helpers::format_db_error(&e);
+                Ok(ChatterMessage {
                     message: Some(message),
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
                     sidecar: ChatterMessageSidecar::SQLExecutionError,
-                });
+                })
             }
         }
     }
