@@ -34,8 +34,8 @@ pub struct DescribeTablesParams {
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 pub struct QueryDatabaseParams {
-    /// The ID of the query. When updating or revising a query, provide the ID of the query you want to update.
-    query_id: Option<String>,
+    /// The ID of the query. When updating or revising a query, provide the ID of the query you want to update. If this is a new query, pass an empty string.
+    query_id: String,
 
     /// The name this query will be referred to as. This will be shown to the user. It must be short and descriptive.
     name: String,
@@ -155,9 +155,10 @@ impl ExecutionContext {
         params: QueryDatabaseParams,
     ) -> Result<ChatterMessage> {
         let query = params.query.trim_end_matches(';');
-        let query_id = params
-            .query_id
-            .unwrap_or_else(|| ulid::Ulid::new().to_string());
+        let mut query_id = params.query_id;
+        if query_id.is_empty() {
+            query_id = ulid::Ulid::new().to_string();
+        }
 
         let sample_size = 5;
         // Call the helper to check the query.

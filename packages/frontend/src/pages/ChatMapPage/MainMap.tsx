@@ -311,7 +311,7 @@ const MainMap: React.FC = () => {
       const featureId = feature.id;
       if (featureId !== undefined) {
         map.setFeatureState(
-          { source: sourceId, id: featureId },
+          { source: sourceId, id: featureId, sourceLayer: "data" },
           { selected: true },
         );
       }
@@ -321,7 +321,11 @@ const MainMap: React.FC = () => {
         const sourceId = `source-${layerName}`;
         const featureId = feature.id;
         if (featureId !== undefined) {
-          map.removeFeatureState({ source: sourceId, id: featureId });
+          map.removeFeatureState({
+            source: sourceId,
+            id: featureId,
+            sourceLayer: "data",
+          });
         }
       }
     };
