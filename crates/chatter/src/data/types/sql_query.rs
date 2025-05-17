@@ -61,6 +61,14 @@ impl SqlQuery {
         self.sk.trim_start_matches("SqlQuery#")
     }
 
+    pub fn matview_name(&self) -> String {
+        format!(
+            "mv{}_{}",
+            self.thread_id().to_ascii_lowercase(),
+            self.id().to_ascii_lowercase()
+        )
+    }
+
     /// Update an existing SQL query
     pub async fn update_query_content(
         db: &Db,

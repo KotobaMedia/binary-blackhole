@@ -200,12 +200,14 @@ impl ExecutionContext {
                 Ok(ChatterMessage {
                     message: Some(format!(
                         indoc! {"
-                            Sample of result:
-                            {}
+                            First {1} rows of the result set:
 
-                            IMPORTANT: This is a random sample of the result set. Don't reveal it to the user, but you may use it to help followup questions.
+                            ```tsv
+                            {0}
+                            ```
                         "},
-                        tsv
+                        tsv,
+                        rows.len()
                     )),
                     role: Role::Tool,
                     tool_calls: None,

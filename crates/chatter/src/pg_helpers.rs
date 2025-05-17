@@ -7,26 +7,7 @@ pub async fn check_query(
     query: &str,
     sample_size: usize,
 ) -> Result<Vec<Row>> {
-    let sample_query = format!(
-        r#"
-        WITH numbered AS (
-            SELECT row_number() OVER () AS __rn, t.*
-            FROM ({}) AS t
-        ), total AS (
-            SELECT count(*) AS cnt FROM numbered
-        ), random_indices AS (
-            SELECT floor(random() * cnt)::int + 1 as __rn
-            FROM total, generate_series(1, {})
-        )
-        SELECT *
-        FROM numbered
-        WHERE __rn IN (
-            SELECT __rn FROM random_indices
-        )
-        ORDER BY __rn;
-        "#,
-        query, sample_size,
-    );
+    let sample_query = format!("SELECT * FROM ({}) AS t LIMIT {}", query, sample_size);
     let rows = client.query(&sample_query, &[]).await?;
     Ok(rows)
 }
@@ -41,6 +22,28 @@ pub fn validate_query_rows(rows: &[tokio_postgres::Row]) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+pub async fn create_matview(
+    client: &tokio_postgres::Client,
+    matview_name: &str,
+    query: &str,
+) -> Result<()> {
+    // Create the materialized view
+    let create_query = format!("CREATE MATERIALIZED VIEW {} AS {}", matview_name, query);
+    client.execute(&create_query, &[]).await?;
+
+    // Sample one row to check for a geometry column
+    let sample_query = format!("SELECT * FROM ({}) AS t LIMIT 1", query);
+    let rows = client.query(&sample_query, &[]).await?;
+
+    if !rows.is_empty() && has_geometry_column(&rows[0]) {
+        // Create a spatial index on the "geom" column if geometry exists
+        let index_query = format!("CREATE INDEX ON {} USING GIST (geom)", matview_name);
+        client.execute(&index_query, &[]).await?;
+    }
+
+    Ok(())
 }
 
 pub fn format_db_error(e: &crate::error::ChatterError) -> String {

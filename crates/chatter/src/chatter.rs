@@ -213,6 +213,18 @@ impl Chatter {
             })?;
         let geom_column_name = geom_column.name();
 
+        // Generate a comma-separated list of columns from source, excluding id and geom columns.
+        let extra_columns: Vec<String> = columns
+            .iter()
+            .filter(|col| col.name() != id_column_name && col.name() != geom_column_name)
+            .map(|col| format!("source.\"{}\"", col.name()))
+            .collect();
+        let extra_columns_str = if extra_columns.is_empty() {
+            "".to_string()
+        } else {
+            format!(", {}", extra_columns.join(", "))
+        };
+
         let query = format!(
             r#"
                 WITH
@@ -226,8 +238,8 @@ impl Chatter {
                     ST_TileEnvelope($1, $2, $3)                            AS env_3857,
                     -- tile envelope reprojected once into 4326 for indexed intersection
                     ST_Transform(
-                    ST_TileEnvelope($1, $2, $3),
-                    4326
+                        ST_TileEnvelope($1, $2, $3),
+                        4326
                     )                                                       AS env_4326
                 ),
 
@@ -247,6 +259,7 @@ impl Chatter {
                         256,
                         TRUE
                     ) AS geom
+                    {extra_columns_str}
                 FROM source
                 CROSS JOIN params
                 WHERE
@@ -255,13 +268,13 @@ impl Chatter {
 
                 -- 4) pack into an MVT blob
                 SELECT
-                ST_AsMVT(
-                    tile,
-                    'data',
-                    4096,
-                    'geom',
-                    '{id_column_name}'
-                ) AS mvt_tile
+                    ST_AsMVT(
+                        tile,
+                        'data',
+                        4096,
+                        'geom',
+                        '{id_column_name}'
+                    ) AS mvt_tile
                 FROM (
                     SELECT * FROM tile_raw
                 ) AS tile;
