@@ -24,27 +24,28 @@ pub fn validate_query_rows(rows: &[tokio_postgres::Row]) -> Result<()> {
     }
 }
 
-pub async fn create_matview(
-    client: &tokio_postgres::Client,
-    matview_name: &str,
-    query: &str,
-) -> Result<()> {
-    // Create the materialized view
-    let create_query = format!("CREATE MATERIALIZED VIEW {} AS {}", matview_name, query);
-    client.execute(&create_query, &[]).await?;
+// let's save this for later
+// pub async fn create_matview(
+//     client: &tokio_postgres::Client,
+//     matview_name: &str,
+//     query: &str,
+// ) -> Result<()> {
+//     // Create the materialized view
+//     let create_query = format!("CREATE MATERIALIZED VIEW {} AS {}", matview_name, query);
+//     client.execute(&create_query, &[]).await?;
 
-    // Sample one row to check for a geometry column
-    let sample_query = format!("SELECT * FROM ({}) AS t LIMIT 1", query);
-    let rows = client.query(&sample_query, &[]).await?;
+//     // Sample one row to check for a geometry column
+//     let sample_query = format!("SELECT * FROM ({}) AS t LIMIT 1", query);
+//     let rows = client.query(&sample_query, &[]).await?;
 
-    if !rows.is_empty() && has_geometry_column(&rows[0]) {
-        // Create a spatial index on the "geom" column if geometry exists
-        let index_query = format!("CREATE INDEX ON {} USING GIST (geom)", matview_name);
-        client.execute(&index_query, &[]).await?;
-    }
+//     if !rows.is_empty() && has_geometry_column(&rows[0]) {
+//         // Create a spatial index on the "geom" column if geometry exists
+//         let index_query = format!("CREATE INDEX ON {} USING GIST (geom)", matview_name);
+//         client.execute(&index_query, &[]).await?;
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 pub fn format_db_error(e: &crate::error::ChatterError) -> String {
     if let crate::error::ChatterError::PostgresError(pg_err) = e {
