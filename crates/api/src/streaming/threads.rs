@@ -11,6 +11,7 @@ use axum::{
     response::IntoResponse,
     routing::post,
 };
+use chatter::chatter::Chatter;
 use chatter::chatter_context::ChatterContext;
 use chatter::chatter_message::Role;
 use chatter::data::types::chat_message::{ChatMessage, ChatMessageBuilder};
@@ -45,19 +46,17 @@ async fn create_thread_message_handler(
     let thread_message_count = messages.len() as u32;
 
     let stream = {
-        let mut chatter = state.chatter.lock().await.clone();
+        let mut chatter = Chatter::new().await?;
         if !messages.is_empty() {
             let ctx = ChatterContext::new_with_stored(
-                &chatter.pg_client,
                 thread_id.to_string(),
                 messages.into_iter().map(|m| m.msg).collect(),
-            )
-            .await?;
-            chatter.switch_context(ctx);
+            );
+            chatter.switch_context(ctx).await?;
         } else {
             chatter.new_context().await?;
         }
-        chatter.context.add_user_message(&payload.content);
+        chatter.add_user_message(&payload.content)?;
         // let messages = &chatter.context.messages;
         // let msg = messages.last().unwrap();
         // let mut binding = ChatMessageBuilder::default();

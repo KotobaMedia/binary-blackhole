@@ -4,6 +4,7 @@ use crate::{
     error::{ChatterError, Result},
     functions::{ExecutionContext, ExecutionContextBuilder},
     geom::GeometryWrapper,
+    pg_helpers::convert_column_value,
 };
 use async_openai::types::{
     ChatCompletionMessageToolCall, ChatCompletionRequestMessage, ChatCompletionResponseMessage,
@@ -12,8 +13,10 @@ use async_openai::types::{
 use async_stream::try_stream;
 use futures::Stream;
 use geo_types::Geometry;
-use rust_decimal::Decimal;
-use std::{env, sync::Arc};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
 use tokio_postgres::NoTls;
 
 pub struct QueryResultRow {
@@ -23,7 +26,7 @@ pub struct QueryResultRow {
 
 #[derive(Clone)]
 pub struct Chatter {
-    pub context: ChatterContext,
+    pub context: Arc<Mutex<ChatterContext>>,
     pub client: async_openai::Client<async_openai::config::OpenAIConfig>,
     pub ddb_client: Arc<crate::data::dynamodb::Db>,
     pub pg_client: Arc<tokio_postgres::Client>,
@@ -49,13 +52,16 @@ impl Chatter {
 
         let ddb_client = Arc::new(crate::data::dynamodb::Db::new().await);
 
+        let context = Arc::new(Mutex::new(ChatterContext::new()));
+
         let func_ctx = ExecutionContextBuilder::default()
             .pg(pg_client.clone())
             .ddb(ddb_client.clone())
+            .chatter_context(context.clone())
             .build()?;
 
         Ok(Self {
-            context: ChatterContext::new(&pg_client).await?,
+            context,
             client: async_openai::Client::new(),
             pg_client,
             ddb_client,
@@ -66,18 +72,36 @@ impl Chatter {
     /// Create a new context with default parameters. The Chatter's internal context
     /// will be replaced with the new context.
     pub async fn new_context(&mut self) -> Result<()> {
-        self.context = ChatterContext::new(&self.pg_client).await?;
-        Ok(())
+        let ctx = ChatterContext::new();
+        self.switch_context(ctx).await
     }
 
     /// Switch the internal context with an already instantiated ChatterContext.
-    pub fn switch_context(&mut self, context: ChatterContext) {
-        self.context = context;
+    pub async fn switch_context(&mut self, mut context: ChatterContext) -> Result<()> {
+        // because the context doesn't have the system message, we will add it here.
+        let system_message = ChatterMessage::create_system_message(&self.pg_client).await?;
+        context.messages.insert(0, system_message);
+
+        // Set the new context
+        self.context = Arc::new(Mutex::new(context));
+        // Update the function context with the new context
+        self.func_ctx.update_context(self.context.clone());
+
+        Ok(())
+    }
+
+    pub fn add_user_message(&mut self, message: &str) -> Result<()> {
+        let mut context = self.context.lock().unwrap();
+        context.add_user_message(message);
+        Ok(())
     }
 
     pub fn execute_stream(mut self) -> impl Stream<Item = Result<ChatterMessage>> {
-        try_stream! {
-            let last_message = self.context.messages.last().cloned();
+        let stream = try_stream! {
+            let last_message = {
+                let context = self.context.lock().unwrap();
+                context.messages.last().cloned()
+            };
             if let Some(last_message) = last_message {
                 yield last_message;
             }
@@ -87,14 +111,20 @@ impl Chatter {
 
                 // Add the AI response to the context
                 let cmessage: ChatterMessage = message.clone().try_into()?;
-                self.context.add_message(cmessage.clone());
+                {
+                    let mut context = self.context.lock().unwrap();
+                    context.add_message(cmessage.clone());
+                };
                 yield cmessage;
 
                 if let Some(tool_calls) = message.tool_calls {
                     // Iterate over all tool calls and process each one
                     for tool_call in tool_calls {
                         let tool_response = self.execute_tool_call(tool_call).await?;
-                        self.context.add_message(tool_response.clone());
+                        {
+                            let mut context = self.context.lock().unwrap();
+                            context.add_message(tool_response.clone());
+                        };
                         yield tool_response;
                     }
                     // Continue the loop to process the next message
@@ -103,28 +133,31 @@ impl Chatter {
                     break;
                 }
             }
-        }
+        };
+        stream
     }
 
     /// Creates and sends a chat completion request, then returns the message from the response.
     async fn create_and_send_request(&mut self) -> Result<ChatCompletionResponseMessage> {
-        // Create the chat completion request
-        let request = CreateChatCompletionRequestArgs::default()
-            .max_completion_tokens(2048u32)
-            .model(&self.context.model)
-            .messages(
-                self.context
-                    .messages
-                    .iter()
-                    .map(|m| m.clone().try_into())
-                    .collect::<Result<Vec<ChatCompletionRequestMessage>>>()?,
-            )
-            .tools(self.context.tools.clone())
-            // The following two options are supported by gpt-4o, but not o3-mini
-            // .temperature(0.2)
-            // .parallel_tool_calls(false) // We only want to run one tool at a time
-            .build()?;
-
+        let request = {
+            let context = self.context.lock().unwrap();
+            // Create the chat completion request
+            CreateChatCompletionRequestArgs::default()
+                .max_completion_tokens(2048u32)
+                .model(&context.model)
+                .messages(
+                    context
+                        .messages
+                        .iter()
+                        .map(|m| m.clone().try_into())
+                        .collect::<Result<Vec<ChatCompletionRequestMessage>>>()?,
+                )
+                .tools(context.tools.clone())
+                // The following two options are supported by gpt-4o, but not o3-mini
+                // .temperature(0.2)
+                // .parallel_tool_calls(false) // We only want to run one tool at a time
+                .build()
+        }?;
         // Send the request and get the response
         let response = self.client.chat().create(request).await?;
         let choice = response.choices[0].clone();
@@ -313,68 +346,6 @@ impl Chatter {
         let maxy: f64 = result.get(3);
 
         Ok([minx, miny, maxx, maxy])
-    }
-}
-
-// Helper function to convert a column value to serde_json::Value based on its type.
-fn convert_column_value(
-    row: &tokio_postgres::Row,
-    index: usize,
-    column: &tokio_postgres::Column,
-) -> serde_json::Value {
-    match column.type_().name() {
-        // Convert text types to JSON string.
-        "varchar" | "text" => {
-            let s: Option<String> = row.get(index);
-            s.map(serde_json::Value::String)
-                .unwrap_or(serde_json::Value::Null)
-        }
-        // Convert integer types.
-        "int4" => {
-            let v: Option<i32> = row.get(index);
-            v.map(|v| serde_json::Value::Number(v.into()))
-                .unwrap_or(serde_json::Value::Null)
-        }
-        "int8" => {
-            let v: Option<i64> = row.get(index);
-            v.map(|v| serde_json::Value::Number(v.into()))
-                .unwrap_or(serde_json::Value::Null)
-        }
-        // Convert floating point types.
-        "float4" => {
-            let v: Option<f32> = row.get(index);
-            v.and_then(|v| serde_json::Number::from_f64(v as f64))
-                .map(serde_json::Value::Number)
-                .unwrap_or(serde_json::Value::Null)
-        }
-        "float8" => {
-            let v: Option<f64> = row.get(index);
-            v.and_then(serde_json::Number::from_f64)
-                .map(serde_json::Value::Number)
-                .unwrap_or(serde_json::Value::Null)
-        }
-        // Convert boolean types.
-        "bool" => {
-            let v: Option<bool> = row.get(index);
-            v.map(serde_json::Value::Bool)
-                .unwrap_or(serde_json::Value::Null)
-        }
-        "numeric" => {
-            let v: Option<Decimal> = row.get(index);
-            v.map(|v| serde_json::Value::String(v.to_string()))
-                .unwrap_or(serde_json::Value::Null)
-        }
-        // If the column is already in JSON format.
-        "json" | "jsonb" => {
-            let v: Option<serde_json::Value> = row.get(index);
-            v.unwrap_or(serde_json::Value::Null)
-        }
-        // Fallback: attempt to get a string representation.
-        _col_type_name => {
-            let s: Option<String> = row.try_get(index).ok().flatten();
-            s.map(serde_json::Value::String)
-                .unwrap_or(serde_json::Value::Null)
-        }
     }
 }
 

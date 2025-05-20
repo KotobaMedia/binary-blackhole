@@ -2,13 +2,13 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ChatterError {
-    #[error("OpenAI error: {0}")]
+    #[error(transparent)]
     OpenAIError(#[from] async_openai::error::OpenAIError),
-    #[error("Postgres error: {0}")]
+    #[error(transparent)]
     PostgresError(#[from] tokio_postgres::Error),
-    #[error("Environment error: {0}")]
+    #[error(transparent)]
     EnvError(#[from] std::env::VarError),
-    #[error("JSON Serialization error: {0}")]
+    #[error(transparent)]
     SerializationError(#[from] serde_json::Error),
 
     #[error("Failed to create function execution context failed: {0}")]

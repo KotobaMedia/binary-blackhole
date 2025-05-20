@@ -39,13 +39,13 @@ pub struct SqlQuery {
 
 impl SqlQueryBuilder {
     /// Custom setter for `thread_id` that sets `pk` automatically.
-    pub fn thread_id(&mut self, thread_id: String) -> &mut Self {
+    pub fn thread_id(&mut self, thread_id: &str) -> &mut Self {
         self.pk = Some(format!("ChatThread#{}", thread_id));
         self
     }
 
     /// Custom setter for `query_id` that sets `sk` automatically.
-    pub fn query_id(&mut self, query_id: String) -> &mut Self {
+    pub fn query_id(&mut self, query_id: &str) -> &mut Self {
         self.sk = Some(format!("SqlQuery#{}", query_id));
         self
     }

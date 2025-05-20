@@ -3,11 +3,12 @@ use crate::state::AppState;
 use anyhow::Context;
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use chatter::chatter::Chatter;
 use geo::{BoundingRect, Geometry, GeometryCollection};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -25,10 +26,9 @@ struct PostQueryResponse {
 }
 
 async fn post_query_handler(
-    State(state): State<AppState>,
     Json(payload): Json<PostQueryRequest>,
 ) -> Result<Json<PostQueryResponse>> {
-    let mut chatter = state.chatter.lock().await;
+    let mut chatter = Chatter::new().await?;
 
     let rows = chatter
         .execute_query(&payload.query)
@@ -66,10 +66,9 @@ struct GetTileQuery {
 }
 
 async fn get_tile_metadata_handler(
-    State(state): State<AppState>,
     Query(query): Query<GetTileQuery>,
 ) -> Result<Json<serde_json::Value>> {
-    let mut chatter = state.chatter.lock().await;
+    let mut chatter = Chatter::new().await?;
 
     let bbox = chatter
         .get_query_bbox(&query.q)
@@ -91,11 +90,10 @@ async fn get_tile_metadata_handler(
 }
 
 async fn get_tile_handler(
-    State(state): State<AppState>,
     Path((z, x, y)): Path<(i32, i32, i32)>,
     Query(query): Query<GetTileQuery>,
 ) -> Result<Response> {
-    let mut chatter = state.chatter.lock().await;
+    let mut chatter = Chatter::new().await?;
 
     let tile = chatter
         .get_tile(&query.q, z, x, y)

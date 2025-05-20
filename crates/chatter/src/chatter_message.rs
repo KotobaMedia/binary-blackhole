@@ -51,6 +51,42 @@ pub struct ChatterMessage {
     pub sidecar: ChatterMessageSidecar,
 }
 
+impl ChatterMessage {
+    pub async fn create_system_message(client: &tokio_postgres::Client) -> Result<ChatterMessage> {
+        let mut tables: String = String::new();
+        let rows = client
+            .query(
+                r#"
+                    SELECT
+                        "table_name",
+                        "metadata"->>'name' AS "name"
+                    FROM "datasets";
+                "#,
+                &[],
+            )
+            .await?;
+        for row in rows {
+            let table_name: String = row.get(0);
+            let name: String = row.get(1);
+            tables.push_str(&format!("- `{}`: {}\n", table_name, name));
+        }
+
+        Ok(ChatterMessage {
+            message: Some(
+                format!(
+                    include_str!("../data/system_prompt_01.txt"),
+                    table_list = tables
+                )
+                .to_string(),
+            ),
+            role: Role::System,
+            tool_calls: None,
+            tool_call_id: None,
+            sidecar: ChatterMessageSidecar::None,
+        })
+    }
+}
+
 impl TryFrom<ChatCompletionResponseMessage> for ChatterMessage {
     type Error = ChatterError;
 

@@ -1,5 +1,6 @@
 //! LLM functions that will be called by the LLM runtime.
 
+use crate::chatter_context::ChatterContext;
 use crate::chatter_message::SQLExecutionDetails;
 use crate::data::dynamodb::Db;
 use crate::data::types::sql_query::SqlQueryBuilder;
@@ -11,16 +12,18 @@ use crate::{
 };
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObject, Role};
 use derive_builder::Builder;
-use indoc::indoc;
 use km_to_sql::metadata::ColumnMetadata;
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Builder, Clone)]
 #[builder(pattern = "owned")]
 pub struct ExecutionContext {
+    /// The context of the chat.
+    chatter_context: Arc<Mutex<ChatterContext>>,
+
     pg: Arc<tokio_postgres::Client>,
     ddb: Arc<Db>,
 }
@@ -74,6 +77,10 @@ fn format_column(column: &ColumnMetadata) -> String {
 }
 
 impl ExecutionContext {
+    pub fn update_context(&mut self, chatter_context: Arc<Mutex<ChatterContext>>) {
+        self.chatter_context = chatter_context;
+    }
+
     fn describe_tables_definition() -> FunctionObject {
         let parameters_schema = json!(schema_for!(DescribeTablesParams));
         FunctionObject {
@@ -168,7 +175,14 @@ impl ExecutionContext {
             Ok(rows) => {
                 if let Err(validation_error) = validate_query_rows(&rows) {
                     return Ok(ChatterMessage {
-                        message: Some(validation_error.to_string()),
+                        message: Some(
+                            json!({
+                                "query_id": query_id,
+                                "error": true,
+                                "message": validation_error.to_string(),
+                            })
+                            .to_string(),
+                        ),
                         role: Role::Tool,
                         tool_calls: None,
                         tool_call_id: Some(tool_call_id.into()),
@@ -179,9 +193,13 @@ impl ExecutionContext {
                     use chrono::Utc;
                     let now = Utc::now();
                     let mut builder = SqlQueryBuilder::default();
+                    let thread_id = {
+                        let chatter_context = self.chatter_context.lock().unwrap();
+                        chatter_context.id.clone()
+                    };
                     builder
-                        .thread_id("default".to_string())
-                        .query_id(ulid::Ulid::new().to_string())
+                        .thread_id(&thread_id)
+                        .query_id(&query_id)
                         .query_name(params.name.clone())
                         .query_content(query.to_string())
                         .created_ts(now)
@@ -198,17 +216,14 @@ impl ExecutionContext {
                 let tsv = rows_to_tsv(&rows);
                 println!("SQL [{}]: {}", params.name, &query);
                 Ok(ChatterMessage {
-                    message: Some(format!(
-                        indoc! {"
-                            First {1} rows of the result set:
-
-                            ```tsv
-                            {0}
-                            ```
-                        "},
-                        tsv,
-                        rows.len()
-                    )),
+                    message: Some(
+                        json!({
+                            "query_id": query_id,
+                            "tsv": tsv,
+                            "tsv_rows": rows.len(),
+                        })
+                        .to_string(),
+                    ),
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
@@ -222,7 +237,14 @@ impl ExecutionContext {
             Err(e) => {
                 let message = crate::pg_helpers::format_db_error(&e);
                 Ok(ChatterMessage {
-                    message: Some(message),
+                    message: Some(
+                        json!({
+                            "query_id": query_id,
+                            "error": true,
+                            "message": message,
+                        })
+                        .to_string(),
+                    ),
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
