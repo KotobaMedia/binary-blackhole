@@ -18,5 +18,14 @@ export class DDB extends Construct {
         type: dynamodb.AttributeType.STRING,
       },
     });
+
+    this.mainTable.addGlobalSecondaryIndex({
+      indexName: "gsi1",
+      partitionKey: {
+        name: "gsi1pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
   }
 }

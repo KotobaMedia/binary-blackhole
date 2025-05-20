@@ -9,13 +9,20 @@ use serde::{Deserialize, Serialize};
 
 pub type Role = OpenAIRole;
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SQLExecutionDetails {
+    pub id: String,
+    pub name: String,
+    pub sql: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum ChatterMessageSidecar {
     #[default]
     None,
 
-    /// Execute some SQL. (name, SQL query)
-    SQLExecution((String, String)),
+    /// Execute some SQL. (Query ID, name, SQL query)
+    SQLExecution(SQLExecutionDetails),
     /// A failed SQL execution.
     SQLExecutionError,
 
@@ -42,6 +49,42 @@ pub struct ChatterMessage {
     #[serde(skip_serializing_if = "ChatterMessageSidecar::is_none")]
     #[serde(default)]
     pub sidecar: ChatterMessageSidecar,
+}
+
+impl ChatterMessage {
+    pub async fn create_system_message(client: &tokio_postgres::Client) -> Result<ChatterMessage> {
+        let mut tables: String = String::new();
+        let rows = client
+            .query(
+                r#"
+                    SELECT
+                        "table_name",
+                        "metadata"->>'name' AS "name"
+                    FROM "datasets";
+                "#,
+                &[],
+            )
+            .await?;
+        for row in rows {
+            let table_name: String = row.get(0);
+            let name: String = row.get(1);
+            tables.push_str(&format!("- `{}`: {}\n", table_name, name));
+        }
+
+        Ok(ChatterMessage {
+            message: Some(
+                format!(
+                    include_str!("../data/system_prompt_01.txt"),
+                    table_list = tables
+                )
+                .to_string(),
+            ),
+            role: Role::System,
+            tool_calls: None,
+            tool_call_id: None,
+            sidecar: ChatterMessageSidecar::None,
+        })
+    }
 }
 
 impl TryFrom<ChatCompletionResponseMessage> for ChatterMessage {

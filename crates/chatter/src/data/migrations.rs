@@ -1,4 +1,4 @@
-use crate::{dynamodb::Db, error::Result};
+use crate::data::{dynamodb::Db, error::Result};
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::AttributeValue;
 use serde::Deserialize;

@@ -7,20 +7,27 @@ authors.workspace = true
 
 [dependencies]
 async-openai = "0.27.2"
-async-stream = "0.3.6"
+async-stream = { workspace = true }
 derive_builder = "0.20.2"
-futures = { version = "0.3.31" }
+futures = { workspace = true }
 geo-traits = "0.2.0"
-geo-types = "0.7"
-indoc = "2.0.6"
+geo-types = { workspace = true }
 km-to-sql = "0.1.1"
 rust_decimal = { version = "1.37.1", features = ["db-tokio-postgres"] }
 schemars = "0.8"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = "2"
-tokio = { version = "1", features = ["sync"] }
-tokio-postgres = { version = "0.7", features = ["with-geo-types-0_7", "with-serde_json-1"] }
-tokio-stream = { version = "0.1.17" }
-ulid = "1.2.0"
+tokio = { workspace = true }
+tokio-postgres = { workspace = true }
+deadpool-postgres = { workspace = true }
+tokio-stream = { workspace = true }
+ulid = { workspace = true }
 wkb = "0.8.0"
+
+# used in data/
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-dynamodb = "1"
+serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
+chrono = { workspace = true }
+async-trait = "0.1.87"

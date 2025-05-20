@@ -7,13 +7,15 @@ use axum::extract::State;
 use axum::http::{Method, StatusCode, header};
 use axum::response::IntoResponse;
 use axum::{Router, routing::get};
+use chatter::chatter::Chatter;
 use std::convert::Infallible;
 use tower_http::cors::{Any, CorsLayer};
 
 async fn health(State(state): State<AppState>) -> AppResult<impl IntoResponse> {
-    let mut chatter = state.chatter.lock().await;
+    let pg = state.postgres_pool.get().await?;
+    let mut chatter = Chatter::new(pg).await?;
     let rows = chatter
-        .execute_query(
+        .execute_raw_query(
             r#"
             SELECT
                 'hello' as "name",

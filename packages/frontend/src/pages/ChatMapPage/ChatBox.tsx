@@ -15,15 +15,21 @@ import { fetcher, streamJsonLines } from "../../tools/api";
 // Types for the API response data
 type Role = "user" | "assistant" | "system" | "tool";
 
+type SQLExecutionDetails = {
+  id: string;
+  name: string;
+  sql: string;
+};
+
 type ChatterMessageSidecar =
   | "None"
   | "DatabaseLookup"
   | {
-      SQLExecution: [string, string];
+      SQLExecution: SQLExecutionDetails;
     };
 function isSidecarSQLExecution(
   sidecar?: ChatterMessageSidecar,
-): sidecar is { SQLExecution: [string, string] } {
+): sidecar is { SQLExecution: SQLExecutionDetails } {
   return typeof sidecar === "object" && sidecar && "SQLExecution" in sidecar;
 }
 
@@ -341,8 +347,9 @@ const ChatBox: React.FC = () => {
       if (content.role === "tool" && isSidecarSQLExecution(content.sidecar)) {
         const execution = content.sidecar.SQLExecution;
         layers.push({
-          name: execution[0],
-          sql: execution[1],
+          id: execution.id,
+          name: execution.name,
+          sql: execution.sql,
           enabled: true,
         });
       }
@@ -387,9 +394,9 @@ const ChatBox: React.FC = () => {
           content.role === "tool" &&
           isSidecarSQLExecution(content.sidecar)
         ) {
-          let sqlText = content.sidecar.SQLExecution[1];
+          let sqlText = content.sidecar.SQLExecution.sql;
           try {
-            sqlText = formatSQL(content.sidecar.SQLExecution[1], {
+            sqlText = formatSQL(content.sidecar.SQLExecution.sql, {
               language: "postgresql",
               tabWidth: 2,
               keywordCase: "upper",

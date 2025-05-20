@@ -11,10 +11,11 @@ use axum::{
     response::IntoResponse,
     routing::post,
 };
+use chatter::chatter::Chatter;
 use chatter::chatter_context::ChatterContext;
 use chatter::chatter_message::Role;
-use data::types::chat_message::{ChatMessage, ChatMessageBuilder};
-use data::types::chat_thread::ChatThread;
+use chatter::data::types::chat_message::{ChatMessage, ChatMessageBuilder};
+use chatter::data::types::chat_thread::ChatThread;
 use futures::{StreamExt, future};
 use serde::Deserialize;
 use serde_json::json;
@@ -33,31 +34,30 @@ async fn create_thread_message_handler(
 ) -> impl IntoResponse {
     let thread_id = Ulid::from_string(&id).context("Invalid thread ID")?;
 
-    let thread = ChatThread::get_thread(&state.db, "demo_user", &thread_id.to_string()).await?;
+    let thread = ChatThread::get_thread(&state.ddb, "demo_user", &thread_id.to_string()).await?;
     if thread.archived.unwrap_or(false) == true {
         return Err(AppError::Conflict("thread_archived".to_string()));
     }
 
     // Get the messages for the thread so we can re-instantiate the context
     let messages =
-        ChatMessage::get_all_thread_messages(&state.db, "demo_user", &thread_id.to_string())
+        ChatMessage::get_all_thread_messages(&state.ddb, "demo_user", &thread_id.to_string())
             .await?;
     let thread_message_count = messages.len() as u32;
 
     let stream = {
-        let mut chatter = state.chatter.lock().await.clone();
+        let pg = state.postgres_pool.get().await?;
+        let mut chatter = Chatter::new(pg).await?;
         if !messages.is_empty() {
             let ctx = ChatterContext::new_with_stored(
-                &chatter.pg_client,
                 thread_id.to_string(),
                 messages.into_iter().map(|m| m.msg).collect(),
-            )
-            .await?;
-            chatter.switch_context(ctx);
+            );
+            chatter.switch_context(ctx).await?;
         } else {
             chatter.new_context().await?;
         }
-        chatter.context.add_user_message(&payload.content);
+        chatter.add_user_message(&payload.content)?;
         // let messages = &chatter.context.messages;
         // let msg = messages.last().unwrap();
         // let mut binding = ChatMessageBuilder::default();
@@ -66,12 +66,12 @@ async fn create_thread_message_handler(
         //     .user_id("demo_user".to_string())
         //     .msg(msg.clone());
         // let message = binding.build()?;
-        // state.db.put_item_excl(&message).await?;
+        // state.ddb.put_item_excl(&message).await?;
 
         chatter.execute_stream()
     };
 
-    let db = state.db.clone();
+    let db = state.ddb.clone();
     let stream = stream
         .enumerate()
         .map(move |(i, m)| {

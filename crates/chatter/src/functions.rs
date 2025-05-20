@@ -1,23 +1,31 @@
 //! LLM functions that will be called by the LLM runtime.
 
-use crate::rows_to_tsv::{has_geometry_column, rows_to_tsv};
+use crate::chatter_context::ChatterContext;
+use crate::chatter_message::SQLExecutionDetails;
+use crate::data::dynamodb::Db;
+use crate::data::types::sql_query::SqlQueryBuilder;
+use crate::pg_helpers::{check_query, validate_query_rows};
+use crate::rows_to_tsv::rows_to_tsv;
 use crate::{
     chatter_message::{ChatterMessage, ChatterMessageSidecar},
     error::Result,
 };
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObject, Role};
 use derive_builder::Builder;
-use indoc::indoc;
 use km_to_sql::metadata::ColumnMetadata;
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Builder, Clone)]
 #[builder(pattern = "owned")]
 pub struct ExecutionContext {
-    client: Arc<tokio_postgres::Client>,
+    /// The context of the chat.
+    chatter_context: Arc<Mutex<ChatterContext>>,
+
+    pg: Arc<deadpool_postgres::Client>,
+    ddb: Arc<Db>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -29,6 +37,9 @@ pub struct DescribeTablesParams {
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 pub struct QueryDatabaseParams {
+    /// The ID of the query. When updating or revising a query, provide the ID of the query you want to update. If this is a new query, pass an empty string.
+    query_id: String,
+
     /// The name this query will be referred to as. This will be shown to the user. It must be short and descriptive.
     name: String,
 
@@ -61,11 +72,15 @@ fn format_column(column: &ColumnMetadata) -> String {
         annotations.push(format!("possible values: {}", enum_v_str));
     }
     out.push_str(&format!(" ({})", annotations.join(", ")));
-    out.push_str("\n");
+    out.push('\n');
     out
 }
 
 impl ExecutionContext {
+    pub fn update_context(&mut self, chatter_context: Arc<Mutex<ChatterContext>>) {
+        self.chatter_context = chatter_context;
+    }
+
     fn describe_tables_definition() -> FunctionObject {
         let parameters_schema = json!(schema_for!(DescribeTablesParams));
         FunctionObject {
@@ -89,7 +104,7 @@ impl ExecutionContext {
         params: DescribeTablesParams,
     ) -> Result<ChatterMessage> {
         let table_names: Vec<&str> = params.table_names.iter().map(|s| s.as_str()).collect();
-        let rows = km_to_sql::postgres::get(&self.client, &table_names).await?;
+        let rows = km_to_sql::postgres::get(&self.pg, &table_names).await?;
 
         let mut out = "".to_string();
         for (table_name, metadata) in rows {
@@ -108,7 +123,7 @@ impl ExecutionContext {
                 for column in metadata.columns {
                     table.push_str(&format_column(&column));
                 }
-                table.push_str("\n");
+                table.push('\n');
             }
 
             out.push_str(&table);
@@ -128,7 +143,7 @@ impl ExecutionContext {
         let parameters_schema = json!(schema_for!(QueryDatabaseParams));
         FunctionObject {
             name: "query_database".into(),
-            description: Some("Query the database and show results to the user. You will have access to a limited subset of the output.\nIf the query is not correct, an error message will be returned.\nIf an error is returned, rewrite the query and try again.\nIf the result set is empty, try again.".into()),
+            description: Some("Query the database and show results to the user. You will have access to a limited subset of the output.\nIf the query is not correct, an error message will be returned.\nIf an error is returned, rewrite the query and try again.\nWhen updating previous queries, provide the `query_id` parameter with the ID of the query you are updating.".into()),
             parameters: Some(parameters_schema),
             strict: Some(true),
         }
@@ -147,37 +162,26 @@ impl ExecutionContext {
         params: QueryDatabaseParams,
     ) -> Result<ChatterMessage> {
         let query = params.query.trim_end_matches(';');
+        let mut query_id = params.query_id;
+        if query_id.is_empty() {
+            query_id = ulid::Ulid::new().to_string();
+        }
 
         let sample_size = 5;
-        let explain_query = format!(
-            r#"
-            WITH numbered AS (
-                SELECT row_number() OVER () AS __rn, t.*
-                FROM ({}) AS t
-            ), total AS (
-                SELECT count(*) AS cnt FROM numbered
-            ), random_indices AS (
-                SELECT floor(random() * cnt)::int + 1 as __rn
-                FROM total, generate_series(1, {})
-            )
-            SELECT *
-            FROM numbered
-            WHERE __rn IN (
-                SELECT __rn FROM random_indices
-            )
-            ORDER BY __rn;
-            "#,
-            query, sample_size,
-        );
-        let result = self.client.query(&explain_query, &[]).await;
+        // Call the helper to check the query.
+        let result = check_query(&self.pg, query, sample_size).await;
 
         match result {
             Ok(rows) => {
-                if rows.len() == 0 {
+                if let Err(validation_error) = validate_query_rows(&rows) {
                     return Ok(ChatterMessage {
                         message: Some(
-                            "Failed to execute query: The result set is empty. Try again."
-                                .to_string(),
+                            json!({
+                                "query_id": query_id,
+                                "error": true,
+                                "message": validation_error.to_string(),
+                            })
+                            .to_string(),
                         ),
                         role: Role::Tool,
                         tool_calls: None,
@@ -185,62 +189,67 @@ impl ExecutionContext {
                         sidecar: ChatterMessageSidecar::SQLExecutionError,
                     });
                 }
-
-                if !has_geometry_column(&rows[0]) {
-                    return Ok(ChatterMessage {
-                        message: Some(
-                            "Failed to execute query: `geom` column was not in the result set."
-                                .to_string(),
-                        ),
-                        role: Role::Tool,
-                        tool_calls: None,
-                        tool_call_id: Some(tool_call_id.into()),
-                        sidecar: ChatterMessageSidecar::SQLExecutionError,
-                    });
+                {
+                    use chrono::Utc;
+                    let now = Utc::now();
+                    let mut builder = SqlQueryBuilder::default();
+                    let thread_id = {
+                        let chatter_context = self.chatter_context.lock().unwrap();
+                        chatter_context.id.clone()
+                    };
+                    builder
+                        .thread_id(&thread_id)
+                        .query_id(&query_id)
+                        .query_name(params.name.clone())
+                        .query_content(query.to_string())
+                        .created_ts(now)
+                        .modified_ts(now)
+                        .accessed_ts(now);
+                    let sql_query = builder.build().map_err(|e| {
+                        crate::error::ChatterError::SqlQueryCreationError(e.to_string())
+                    })?;
+                    self.ddb.put_item(&sql_query).await.map_err(|e| {
+                        crate::error::ChatterError::SqlQueryCreationError(e.to_string())
+                    })?;
                 }
 
                 let tsv = rows_to_tsv(&rows);
                 println!("SQL [{}]: {}", params.name, &query);
-                return Ok(ChatterMessage {
-                    message: Some(format!(
-                        indoc! {"
-                            Sample of result:
-                            {}
-
-                            IMPORTANT: This is a random sample of the result set. Don't reveal it to the user, but you may use it to help followup questions.
-                        "},
-                        tsv
-                    )),
+                Ok(ChatterMessage {
+                    message: Some(
+                        json!({
+                            "query_id": query_id,
+                            "tsv": tsv,
+                            "tsv_rows": rows.len(),
+                        })
+                        .to_string(),
+                    ),
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
-                    sidecar: ChatterMessageSidecar::SQLExecution((params.name, query.to_string())),
-                });
+                    sidecar: ChatterMessageSidecar::SQLExecution(SQLExecutionDetails {
+                        id: query_id,
+                        name: params.name,
+                        sql: query.to_string(),
+                    }),
+                })
             }
             Err(e) => {
-                let message = if let Some(db_error) = e.as_db_error() {
-                    format!(
-                        "Failed to execute query: {}{}{}",
-                        db_error.message(),
-                        db_error
-                            .where_()
-                            .map(|where_| format!(", where: {}", where_))
-                            .unwrap_or_default(),
-                        db_error
-                            .hint()
-                            .map(|hint| format!(", hint: {}", hint))
-                            .unwrap_or_default()
-                    )
-                } else {
-                    format!("Failed to execute query: {}", e)
-                };
-                return Ok(ChatterMessage {
-                    message: Some(message),
+                let message = crate::pg_helpers::format_db_error(&e);
+                Ok(ChatterMessage {
+                    message: Some(
+                        json!({
+                            "query_id": query_id,
+                            "error": true,
+                            "message": message,
+                        })
+                        .to_string(),
+                    ),
                     role: Role::Tool,
                     tool_calls: None,
                     tool_call_id: Some(tool_call_id.into()),
                     sidecar: ChatterMessageSidecar::SQLExecutionError,
-                });
+                })
             }
         }
     }

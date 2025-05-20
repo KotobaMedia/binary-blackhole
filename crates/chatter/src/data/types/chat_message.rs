@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-
-use crate::dynamodb::Db;
-use crate::error::Result;
-use crate::migrations::{Migratable, Migrator};
+use crate::data::dynamodb::Db;
+use crate::data::error::Result;
+use crate::data::migrations::{Migratable, Migrator};
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::AttributeValue;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Builder, Clone, Debug)]
 pub struct ChatMessage {
@@ -17,7 +16,7 @@ pub struct ChatMessage {
     #[builder(setter(custom))]
     pub sk: String,
 
-    pub msg: chatter::chatter_message::ChatterMessage,
+    pub msg: crate::chatter_message::ChatterMessage,
 }
 
 impl ChatMessageBuilder {
@@ -74,7 +73,7 @@ impl ChatMessage {
         // Convert DynamoDB items to ChatMessage structs
         let messages = items
             .into_iter()
-            .map(|item| serde_dynamo::from_item(item))
+            .map(serde_dynamo::from_item)
             .collect::<std::result::Result<Vec<Self>, _>>()?;
 
         Ok(messages)

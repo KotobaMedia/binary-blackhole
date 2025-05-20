@@ -12,6 +12,13 @@ create user bbh_ro with password '...';
 grant usage on schema public to bbh_ro;
 grant select on all tables in schema public to bbh_ro;
 alter default privileges in schema public grant select on tables to bbh_ro;
+
+create user bbh_mview with password '...';
+grant usage on schema public to bbh_mview;
+grant create on schema public to bbh_mview;
+grant select on all tables in schema public to bbh_mview;
+grant all privileges on all materialized views in schema public to bbh_mview;
+alter default privileges in schema public grant all privileges on materialized views to bbh_mview;
 ```
 
 ## Testing database

@@ -1,5 +1,5 @@
-use crate::error::{DataError, Result};
-use crate::migrations::Migratable;
+use crate::data::error::{DataError, Result};
+use crate::data::migrations::Migratable;
 use aws_config::Region;
 use aws_sdk_dynamodb::operation::query::builders::QueryFluentBuilder;
 use aws_sdk_dynamodb::types::AttributeValue;
@@ -39,8 +39,8 @@ impl Db {
                 .await;
             return config;
         }
-        let config = aws_config::load_from_env().await;
-        config
+        
+        aws_config::load_from_env().await
     }
 
     /// Creates a new `Db` by loading AWS config from the environment and reading TABLE_NAME.
@@ -53,7 +53,7 @@ impl Db {
 
         // Initialize the database if in dev/test environments and the endpoint override is set. When we're connecting to AWS DynamoDB, we don't want to initialize the database, but we do if we're connecting to a local DynamoDB instance.
         #[cfg(any(debug_assertions, test))]
-        if let Some(_) = get_endpoint_url() {
+        if get_endpoint_url().is_some() {
             db.init_schema().await;
         }
 
@@ -63,7 +63,7 @@ impl Db {
     /// Initialize the database. Only avaliable in dev/test environments.
     #[cfg(any(debug_assertions, test))]
     pub async fn init_schema(&self) {
-        use crate::dynamodb_schema::create_table_if_not_exists;
+        use crate::data::dynamodb_schema::create_table_if_not_exists;
         create_table_if_not_exists(self).await;
     }
 
@@ -103,8 +103,7 @@ impl Db {
             .await
             .map_err(|err| {
                 if let Some(true) = err
-                    .as_service_error()
-                    .and_then(|se| Some(se.is_conditional_check_failed_exception()))
+                    .as_service_error().map(|se| se.is_conditional_check_failed_exception())
                 {
                     return DataError::OptimisticLockFailed;
                 }
@@ -181,13 +180,13 @@ impl Db {
     where
         T: Migratable + std::marker::Send,
     {
-        T::migrate_and_parse(&self, item).await
+        T::migrate_and_parse(self, item).await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::types::{
+    use crate::data::types::{
         chat_message::{ChatMessage, ChatMessageBuilder},
         chat_thread::ChatThreadBuilder,
     };
@@ -203,12 +202,12 @@ mod tests {
         let chat_message = ChatMessageBuilder::default()
             .user_id("user123".to_string())
             .thread_message_ids("thread456".to_string(), 1)
-            .msg(chatter::chatter_message::ChatterMessage {
-                role: chatter::chatter_message::Role::User,
+            .msg(crate::chatter_message::ChatterMessage {
+                role: crate::chatter_message::Role::User,
                 tool_calls: None,
                 tool_call_id: None,
                 message: Some("Hello, world!".to_string()),
-                sidecar: chatter::chatter_message::ChatterMessageSidecar::None,
+                sidecar: crate::chatter_message::ChatterMessageSidecar::None,
             })
             .build()
             .expect("Failed building ChatMessage");
@@ -263,7 +262,7 @@ mod tests {
             .user_id("user123".to_string())
             .id("thread456".to_string())
             .title("Test Thread".to_string())
-            .modified_ts(original_ts.clone())
+            .modified_ts(original_ts)
             .archived(Some(false))
             .build()
             .expect("Failed building ChatThread");

@@ -1,25 +1,40 @@
-use chatter::chatter::Chatter;
-use data::dynamodb::Db;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use crate::error::Result;
+use chatter::data::dynamodb::Db;
+use deadpool_postgres::{Config, ManagerConfig, Pool, PoolConfig, RecyclingMethod, Runtime};
+use std::{env, sync::Arc};
+use tokio_postgres::NoTls;
 
 /// Application state shared across all requests.
 /// This is a singleton. However, this runs in Lambda, so theoretically it only services
-/// one request at a time. We're using Arc and Mutex just to satisfy the borrow checker.
+/// one request at a time. We're using Arc just to satisfy the borrow checker.
 /// Maybe that could be improved later.
 #[derive(Clone)]
 pub struct AppState {
-    pub db: Arc<Db>,
-    pub chatter: Arc<Mutex<Chatter>>,
+    pub ddb: Arc<Db>,
+    pub postgres_pool: Pool,
 }
 
 impl AppState {
     pub async fn new() -> Self {
         let db = Db::new().await;
-        let chatter = Chatter::new().await.unwrap();
         Self {
-            db: Arc::new(db),
-            chatter: Arc::new(Mutex::new(chatter)),
+            ddb: Arc::new(db),
+            postgres_pool: Self::get_postgres_pool().unwrap(),
         }
+    }
+
+    fn get_postgres_pool() -> Result<Pool> {
+        let mut cfg = Config::new();
+        let config = env::var("POSTGRES_CONN_STR")?;
+        cfg.url = Some(config);
+        cfg.pool = Some(PoolConfig {
+            max_size: 1,
+            ..Default::default()
+        });
+        cfg.manager = Some(ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        });
+        let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
+        Ok(pool)
     }
 }

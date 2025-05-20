@@ -5,15 +5,17 @@ use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::get;
 use axum::{Router, extract::State};
+use chatter::chatter::Chatter;
 use tower_http::cors::{Any, CorsLayer};
 
 async fn root() -> Redirect {
     Redirect::temporary("https://www.bblackhole.com/")
 }
 async fn health(State(state): State<AppState>) -> AppResult<String> {
-    let mut chatter = state.chatter.lock().await;
+    let pg = state.postgres_pool.get().await?;
+    let mut chatter = Chatter::new(pg).await?;
     let rows = chatter
-        .execute_query(
+        .execute_raw_query(
             r#"
             SELECT
                 'hello' as "name",

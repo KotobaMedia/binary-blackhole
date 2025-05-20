@@ -6,5 +6,19 @@ package.authors = [
   "Keitaroh Kobayashi <keita@kotobamedia.com>"
 ]
 members = [
-  "crates/api", "crates/chatter", "crates/cli", "crates/data",
+  "crates/api", "crates/chatter",
 ]
+
+[workspace.dependencies]
+
+tokio = { version = "1", features = ["macros", "sync"] }
+tokio-postgres = { version = "0.7", features = ["with-geo-types-0_7", "with-serde_json-1"] }
+deadpool-postgres = { version = "0.14", features = ["rt_tokio_1"] }
+futures = { version = "0.3.31" }
+geo-types = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.138"
+ulid = "1.2.0"
+async-stream = "0.3.6"
+tokio-stream = "0.1.17"
+chrono = { version = "0.4.40", features = ["serde"] }

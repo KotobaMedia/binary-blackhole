@@ -2,6 +2,7 @@ import { atom } from "jotai";
 import type { MapGeoJSONFeature } from "react-map-gl/maplibre";
 
 export type SQLLayer = {
+  id: string;
   name: string;
   sql: string;
   enabled: boolean;
@@ -10,7 +11,7 @@ export type SQLLayer = {
 
 export type SelectedFeatureInfo = {
   feature: MapGeoJSONFeature;
-  layerName: string;
+  layer: SQLLayer;
   geometryType: string;
 };
 
@@ -21,7 +22,7 @@ export const layersAtom = atom<SQLLayer[]>([]);
 export const mergedLayersAtom = atom<SQLLayer[]>((get) => {
   const allLayers = get(layersAtom);
   const dedupedLayers = allLayers.reduce((acc: SQLLayer[], layer: SQLLayer) => {
-    const existingLayerIdx = acc.findIndex((l) => l.name === layer.name);
+    const existingLayerIdx = acc.findIndex((l) => l.id === layer.id);
     if (existingLayerIdx >= 0) {
       // replace the existing layer with the new one
       acc.splice(existingLayerIdx, 1, layer);

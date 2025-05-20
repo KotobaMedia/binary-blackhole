@@ -2,14 +2,18 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ChatterError {
-    #[error("OpenAI error: {0}")]
+    #[error(transparent)]
     OpenAIError(#[from] async_openai::error::OpenAIError),
-    #[error("Postgres error: {0}")]
+    #[error(transparent)]
     PostgresError(#[from] tokio_postgres::Error),
-    #[error("Environment error: {0}")]
+    #[error(transparent)]
     EnvError(#[from] std::env::VarError),
-    #[error("JSON Serialization error: {0}")]
+    #[error(transparent)]
     SerializationError(#[from] serde_json::Error),
+    #[error(transparent)]
+    DeadpoolPostgresPoolError(#[from] deadpool_postgres::PoolError),
+    #[error(transparent)]
+    DeadpoolPostgresCreatePoolError(#[from] deadpool_postgres::CreatePoolError),
 
     #[error("Failed to create function execution context failed: {0}")]
     ExecutionContextBuilderError(#[from] crate::functions::ExecutionContextBuilderError),
@@ -24,6 +28,11 @@ pub enum ChatterError {
 
     #[error("ToSQL Error: {0}")]
     ToSQLError(#[from] km_to_sql::error::Error),
+
+    #[error("SQL Query Error: {0}")]
+    QueryError(String),
+    #[error("SQL query creation error: {0}")]
+    SqlQueryCreationError(String),
 }
 
 pub type Result<T> = std::result::Result<T, ChatterError>;
