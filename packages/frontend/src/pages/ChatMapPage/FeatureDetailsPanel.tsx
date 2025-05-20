@@ -34,8 +34,8 @@ const LayerTableView: React.FC<{
   const allSelectedFeatures = useAtomValue(selectedFeaturesAtom);
   const selectedFeatures = useMemo(
     () =>
-      allSelectedFeatures.filter((feature) => feature.layerName === layer.name),
-    [allSelectedFeatures, layer.name],
+      allSelectedFeatures.filter((feature) => feature.layer.id === layer.id),
+    [allSelectedFeatures, layer.id],
   );
   // const setSelectedFeatures = useSetAtom(selectedFeaturesAtom);
   const rowSelection: RowSelectionState = useMemo(() => {
@@ -121,7 +121,7 @@ const LayerTableView: React.FC<{
     getCoreRowModel: getCoreRowModel(),
     columnResizeMode: "onChange",
     getRowId: (feature, idx) => {
-      return (feature.id ?? idx).toString();
+      return (feature._id ?? idx).toString();
     },
     onRowSelectionChange: setRowSelection,
     state: {
@@ -223,7 +223,7 @@ const FeatureDetailsPanel: React.FC = () => {
     // Select the layer of the first selected feature
     if (selectedFeatures.length > 0) {
       const layer = layers.find(
-        (layer) => layer.name === selectedFeatures[0].layerName,
+        (layer) => layer.id === selectedFeatures[0].layer.id,
       );
       if (layer) {
         setSelectedLayer(layer);

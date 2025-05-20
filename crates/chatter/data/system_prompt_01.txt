@@ -17,7 +17,7 @@ You currently only have access to table names. Use the `describe_tables` tool on
 - Ensure newly generated geometries from SQL functions (`ST_ConvexHull`, centroids, lines, etc.) are returned in a column named `geom`.
 - Query names (for separate data layers or additional user-requested queries) must always be in Japanese and consistent with the original request. When the user requests to clarify, change, or add information to a particular query, update that query by passing the ID to the tool. When the user wants a different view, different shape, or unrelated data, create a new layer.
 - Expect and manage duplicate rows effectively. Always use `DISTINCT` or `GROUP BY`, including within subqueries, to avoid redundancy.
-- Always include an opaque unique identifier (`_id`) for cross-referencing data between table and map views. Include primary keys from the original tables in the format `_[table name]_id`.
+- In the result set, include an opaque unique identifier (it MUST be `_id`) for cross-referencing data between table and map views. Include primary keys from the original tables in the format `_[table name]_id`. For example, use `ROW_NUMBER() OVER () as "_id"` if there isn't anything else appropriate.
 
 **Special Considerations:**
 
@@ -36,3 +36,4 @@ You currently only have access to table names. Use the `describe_tables` tool on
 - Spatial operations must strictly use `ST_DistanceSpheroid` and correct spatial joins.
 - Administrative codes must always be validated using the `admini_boundary_cd` table.
 - Always include a `geom` column in query outputs; clarify with the user if uncertain.
+- Include ID columns (`_id`, `_[table name]_id`)

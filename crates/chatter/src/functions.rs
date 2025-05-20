@@ -143,7 +143,7 @@ impl ExecutionContext {
         let parameters_schema = json!(schema_for!(QueryDatabaseParams));
         FunctionObject {
             name: "query_database".into(),
-            description: Some("Query the database and show results to the user. You will have access to a limited subset of the output.\nIf the query is not correct, an error message will be returned.\nIf an error is returned, rewrite the query and try again.\nIf the result set is empty, try again.\nWhen updating previous queries, provide the `query_id` parameter with the ID of the query you are updating.".into()),
+            description: Some("Query the database and show results to the user. You will have access to a limited subset of the output.\nIf the query is not correct, an error message will be returned.\nIf an error is returned, rewrite the query and try again.\nWhen updating previous queries, provide the `query_id` parameter with the ID of the query you are updating.".into()),
             parameters: Some(parameters_schema),
             strict: Some(true),
         }

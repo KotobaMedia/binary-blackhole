@@ -227,9 +227,10 @@ impl Chatter {
         let stmt = self.pg_client.prepare(&query_str).await?;
         let columns = stmt.columns();
         // get the first column from the query -- that will be our ID column
-        let id_column = columns.first().ok_or_else(|| {
-            ChatterError::QueryError("No columns found in the query result.".to_string())
-        })?;
+        let id_column = columns
+            .iter()
+            .find(|col| col.name() == "_id")
+            .ok_or_else(|| ChatterError::QueryError("No ID column found".to_string()))?;
         let id_column_name = id_column.name();
         let geom_column = columns
             .iter()

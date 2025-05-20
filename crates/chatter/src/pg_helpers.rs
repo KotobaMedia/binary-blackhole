@@ -13,6 +13,10 @@ pub async fn check_query(
     Ok(rows)
 }
 
+fn has_id_column(row: &Row) -> bool {
+    row.columns().iter().any(|col| col.name() == "_id")
+}
+
 pub fn validate_query_rows(rows: &[tokio_postgres::Row]) -> Result<()> {
     if rows.is_empty() {
         Err(ChatterError::QueryError(
@@ -20,6 +24,10 @@ pub fn validate_query_rows(rows: &[tokio_postgres::Row]) -> Result<()> {
         ))
     } else if !has_geometry_column(&rows[0]) {
         Err(ChatterError::GeometryNotFound)
+    } else if !has_id_column(&rows[0]) {
+        Err(ChatterError::QueryError(
+            "Failed to execute query: The result set does not contain an _id column.".to_string(),
+        ))
     } else {
         Ok(())
     }

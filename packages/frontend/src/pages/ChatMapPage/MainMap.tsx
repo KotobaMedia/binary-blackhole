@@ -32,6 +32,10 @@ const getLayerColor = (layerName: string) => {
   return chroma.hsl(hue, 0.7, 0.5).hex();
 };
 
+const getLayerSourceId = (layer: SQLLayer) => `overlay-${layer.id}`;
+const getStyleLayerId = (layer: SQLLayer, type: string) =>
+  `overlay/${layer.id}/${type}`;
+
 // Function to merge multiple bounding boxes
 const mergeBboxes = (bboxes: BBox[]): BBox | undefined => {
   if (bboxes.length === 0) return undefined;
@@ -78,14 +82,14 @@ const MapLayer: React.FC<{
   }
   if (!resp) return <></>;
 
-  const sourceId = `source-${layer.name}`;
+  const sourceId = getLayerSourceId(layer);
   const layerColor = getLayerColor(layer.name);
 
   return (
     <Source id={sourceId} type="vector" {...resp}>
       {/* Point layer */}
       <Layer
-        id={`${layer.name}/point`}
+        id={getStyleLayerId(layer, "point")}
         source={sourceId}
         source-layer="data"
         type="circle"
@@ -101,7 +105,7 @@ const MapLayer: React.FC<{
 
       {/* Line layer */}
       <Layer
-        id={`${layer.name}/line`}
+        id={getStyleLayerId(layer, "line")}
         source={sourceId}
         source-layer="data"
         type="line"
@@ -115,7 +119,7 @@ const MapLayer: React.FC<{
 
       {/* Polygon layer */}
       <Layer
-        id={`${layer.name}/polygon-fill`}
+        id={getStyleLayerId(layer, "polygon-fill")}
         source={sourceId}
         source-layer="data"
         type="fill"
@@ -128,7 +132,7 @@ const MapLayer: React.FC<{
 
       {/* Polygon outline */}
       <Layer
-        id={`${layer.name}/polygon-outline`}
+        id={getStyleLayerId(layer, "polygon-outline")}
         source={sourceId}
         source-layer="data"
         type="line"
@@ -142,7 +146,7 @@ const MapLayer: React.FC<{
 
       {/* Selected outline for Points */}
       <Layer
-        id={`${layer.name}/point-selected-outline`}
+        id={getStyleLayerId(layer, "point-selected-outline")}
         source={sourceId}
         source-layer="data"
         type="circle"
@@ -163,7 +167,7 @@ const MapLayer: React.FC<{
 
       {/* Selected outline for Lines */}
       <Layer
-        id={`${layer.name}/line-selected-outline`}
+        id={getStyleLayerId(layer, "line-selected-outline")}
         source={sourceId}
         source-layer="data"
         type="line"
@@ -182,7 +186,7 @@ const MapLayer: React.FC<{
 
       {/* Selected outline for Polygons */}
       <Layer
-        id={`${layer.name}/polygon-selected-outline`}
+        id={getStyleLayerId(layer, "polygon-selected-outline")}
         source={sourceId}
         source-layer="data"
         type="line"
@@ -233,10 +237,10 @@ const MainMap: React.FC = () => {
       // Get all visible layers that we've added
       const visibleLayers = layers
         .map((layer) => [
-          `${layer.name}/point`,
-          `${layer.name}/line`,
-          `${layer.name}/polygon-fill`,
-          `${layer.name}/polygon-outline`,
+          getStyleLayerId(layer, "point"),
+          getStyleLayerId(layer, "line"),
+          getStyleLayerId(layer, "polygon-fill"),
+          getStyleLayerId(layer, "polygon-outline"),
         ])
         .flat();
 
@@ -249,25 +253,32 @@ const MainMap: React.FC = () => {
         console.log("Clicked features:", features);
 
         // Format feature information and store in the atom
-        const formattedFeatures: SelectedFeatureInfo[] = features.map(
-          (feature) => {
+        const formattedFeatures: SelectedFeatureInfo[] = features
+          .map((feature) => {
             const layerId = feature.layer.id;
-            const layerName = layerId.split("/")[0];
-            const geometryType = layerId.split("/")[1];
+            const sqlLayerId = layerId.split("/")[1];
+            const geometryType = layerId.split("/")[2];
+
+            const sqlLayer = layers.find((layer) => layer.id === sqlLayerId);
+            if (!sqlLayer) {
+              return null;
+            }
 
             // Log for debugging
-            console.log(`Feature from layer: ${layerName} (${geometryType})`);
+            console.log(
+              `Feature from layer: ${sqlLayer?.name} (${geometryType})`,
+            );
             console.log("Properties:", feature.properties);
             console.log("Geometry type:", feature.geometry.type);
             console.log("-------------------");
 
             return {
               feature,
-              layerName,
+              layer: sqlLayer,
               geometryType,
             };
-          },
-        );
+          })
+          .filter((item): item is SelectedFeatureInfo => item !== null);
 
         // Update the atom with selected features
         setSelectedFeatures(formattedFeatures);
@@ -306,8 +317,8 @@ const MainMap: React.FC = () => {
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
     const f = selectedFeatures;
-    for (const { layerName, feature } of f) {
-      const sourceId = `source-${layerName}`;
+    for (const { layer, feature } of f) {
+      const sourceId = getLayerSourceId(layer);
       const featureId = feature.id;
       if (featureId !== undefined) {
         map.setFeatureState(
@@ -317,8 +328,8 @@ const MainMap: React.FC = () => {
       }
     }
     return () => {
-      for (const { layerName, feature } of f) {
-        const sourceId = `source-${layerName}`;
+      for (const { layer, feature } of f) {
+        const sourceId = getLayerSourceId(layer);
         const featureId = feature.id;
         if (featureId !== undefined) {
           map.removeFeatureState({

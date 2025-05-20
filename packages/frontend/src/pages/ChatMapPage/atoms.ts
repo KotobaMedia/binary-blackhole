@@ -11,7 +11,7 @@ export type SQLLayer = {
 
 export type SelectedFeatureInfo = {
   feature: MapGeoJSONFeature;
-  layerName: string;
+  layer: SQLLayer;
   geometryType: string;
 };
 
