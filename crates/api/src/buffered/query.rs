@@ -11,6 +11,7 @@ use axum::{
 use chatter::chatter::Chatter;
 use serde::Deserialize;
 use serde_json::json;
+use std::env;
 
 #[derive(Deserialize)]
 struct QueryString {
@@ -36,7 +37,6 @@ async fn get_table_handler(
 }
 
 async fn get_tile_metadata_handler(
-    headers: HeaderMap,
     Query(query): Query<QueryString>,
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>> {
@@ -50,19 +50,7 @@ async fn get_tile_metadata_handler(
 
     let escaped_q = urlencoding::encode(&query.q);
 
-    // Extract host and create base URL
-    let host = headers
-        .get(header::HOST)
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("localhost:9000");
-
-    // Determine protocol (use https if X-Forwarded-Proto indicates it)
-    let protocol = headers
-        .get("X-Forwarded-Proto")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("http");
-
-    let base_url = format!("{}://{}", protocol, host);
+    let base_url = env::var("API_URL").unwrap_or_else(|_| "http://localhost:9000".to_string());
 
     Ok(Json(json!({
         "tilejson": "3.0.0",

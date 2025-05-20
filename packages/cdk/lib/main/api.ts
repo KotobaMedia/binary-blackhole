@@ -36,6 +36,9 @@ export class API extends Construct {
     const rdsPassword = process.env[`RDS_PASSWORD_${getStageName(this)}`];
     const connStr = `host=${clusterReadEndpoint} port=${clusterReadPort} user=bbh_ro dbname=bbh password=${rdsPassword}`;
 
+    const apiUrl = process.env[`API_URL_${getStageName(this)}`];
+    const appUrl = process.env[`APP_URL_${getStageName(this)}`];
+
     this.apiFn = new RustFunction(this, "API", {
       binaryName: "api",
       manifestPath: path.join(__dirname, "../../../../Cargo.toml"),
@@ -44,6 +47,8 @@ export class API extends Construct {
         TABLE_NAME: mainTable.tableName,
         POSTGRES_CONN_STR: connStr,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
+        API_URL: apiUrl ?? "",
+        APP_URL: appUrl ?? "",
       },
       memorySize: 512,
       timeout: Duration.seconds(30),
