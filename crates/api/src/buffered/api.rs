@@ -14,7 +14,7 @@ async fn root() -> Redirect {
 async fn health() -> AppResult<String> {
     let mut chatter = Chatter::new().await?;
     let rows = chatter
-        .execute_query(
+        .execute_raw_query(
             r#"
             SELECT
                 'hello' as "name",

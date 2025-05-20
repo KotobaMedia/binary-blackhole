@@ -1,6 +1,7 @@
 use crate::{
     chatter_context::ChatterContext,
     chatter_message::ChatterMessage,
+    data::types::sql_query::SqlQuery,
     error::{ChatterError, Result},
     functions::{ExecutionContext, ExecutionContextBuilder},
     geom::GeometryWrapper,
@@ -193,7 +194,7 @@ impl Chatter {
     /// TODO: This area requires a lot of refactoring -- the query_database tool
     /// should actually run the query, store the result somewhere, then return the ID of
     /// the execution, rendering this function obsolete. This is used in the meantime.
-    pub async fn execute_query(&mut self, query: &str) -> Result<Vec<QueryResultRow>> {
+    pub async fn execute_raw_query(&mut self, query: &str) -> Result<Vec<QueryResultRow>> {
         // Execute the provided query directly.
         let rows = self.pg_client.query(query, &[]).await?;
         let mut results = Vec::with_capacity(rows.len());
@@ -228,8 +229,12 @@ impl Chatter {
 
     /// Execute a SQL query for a given XYZ tile and return the result as a MVT binary.
     /// Note: the query's geometry column must be named "geom" and the ID column must be named "ogc_fid".
-    pub async fn get_tile(&mut self, query: &str, z: i32, x: i32, y: i32) -> Result<Vec<u8>> {
-        let stmt = self.pg_client.prepare(query).await?;
+    pub async fn get_tile(&mut self, query_id: &str, z: i32, x: i32, y: i32) -> Result<Vec<u8>> {
+        let query_obj = SqlQuery::get_query(&self.ddb_client, query_id)
+            .await
+            .map_err(|e| ChatterError::QueryError(e.to_string()))?;
+        let query_str = query_obj.query_content;
+        let stmt = self.pg_client.prepare(&query_str).await?;
         let columns = stmt.columns();
         // get the first column from the query -- that will be our ID column
         let id_column = columns.first().ok_or_else(|| {
@@ -278,7 +283,7 @@ impl Chatter {
 
                 -- 2) your auto‐generated subquery goes here
                 source AS (
-                    {query}
+                    {query_str}
                 ),
 
                 -- 3) only intersect in 4326 (uses index on source.geom), then reproject+clip
@@ -322,12 +327,16 @@ impl Chatter {
         })
     }
 
-    pub async fn get_query_bbox(&mut self, input_query: &str) -> Result<[f64; 4]> {
-        let query = format!(
+    pub async fn get_query_bbox(&mut self, query_id: &str) -> Result<[f64; 4]> {
+        let query_obj = SqlQuery::get_query(&self.ddb_client, query_id)
+            .await
+            .map_err(|e| ChatterError::QueryError(e.to_string()))?;
+        let query_str = query_obj.query_content;
+        let extent_query = format!(
             r#"
                 WITH
                 source AS (
-                    {input_query}
+                    {query_str}
                 )
                 SELECT
                     ST_XMin(extent) AS minx,
@@ -339,7 +348,7 @@ impl Chatter {
                 ) AS agg;
             "#,
         );
-        let result = self.pg_client.query_one(&query, &[]).await?;
+        let result = self.pg_client.query_one(&extent_query, &[]).await?;
         let minx: f64 = result.get(0);
         let miny: f64 = result.get(1);
         let maxx: f64 = result.get(2);
@@ -366,7 +375,7 @@ mod tests {
         let mut chatter = Chatter::new().await?;
         // some data we just create for the test
         let rows = chatter
-            .execute_query(
+            .execute_raw_query(
                 r#"
                 SELECT
                     'hello' as "name",

@@ -54,7 +54,7 @@ const MapLayer: React.FC<{
   layer: SQLLayer;
   onBboxChange: (name: string, bbox: BBox | undefined) => void;
 }> = ({ layer, onBboxChange }) => {
-  const { data: resp, error } = useQueryMetadata(layer.sql);
+  const { data: resp, error } = useQueryMetadata(layer.id);
   const setLayers = useSetAtom(layersAtom);
 
   useEffect(() => {

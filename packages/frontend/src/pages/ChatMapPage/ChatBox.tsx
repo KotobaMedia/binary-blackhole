@@ -347,6 +347,7 @@ const ChatBox: React.FC = () => {
       if (content.role === "tool" && isSidecarSQLExecution(content.sidecar)) {
         const execution = content.sidecar.SQLExecution;
         layers.push({
+          id: execution.id,
           name: execution.name,
           sql: execution.sql,
           enabled: true,

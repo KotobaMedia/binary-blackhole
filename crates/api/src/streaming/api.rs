@@ -13,7 +13,7 @@ use tower_http::cors::{Any, CorsLayer};
 async fn health() -> AppResult<impl IntoResponse> {
     let mut chatter = Chatter::new().await?;
     let rows = chatter
-        .execute_query(
+        .execute_raw_query(
             r#"
             SELECT
                 'hello' as "name",

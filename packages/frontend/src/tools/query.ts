@@ -45,10 +45,10 @@ export type QueryMetadataResponse = {
   maxzoom: number;
 };
 
-const queryMetadataFetcher = async (sql: string) => {
+const queryMetadataFetcher = async (id: string) => {
   const apiUrl = import.meta.env.VITE_API_URL;
   const response = await fetch(
-    `${apiUrl}/tile.json?q=${encodeURIComponent(sql)}`,
+    `${apiUrl}/tile.json?q=${encodeURIComponent(id)}`,
   );
 
   if (!response.ok) {
@@ -60,14 +60,14 @@ const queryMetadataFetcher = async (sql: string) => {
 };
 
 export const useQueryMetadata = (
-  sql: string | undefined,
+  id: string | undefined,
   config?: SWRConfiguration<
     QueryMetadataResponse,
     Error,
     BareFetcher<QueryMetadataResponse>
   >,
 ) => {
-  return useSWR(sql ? sql : null, queryMetadataFetcher, {
+  return useSWR(id ? id : null, queryMetadataFetcher, {
     revalidateOnFocus: false,
     ...config,
   });

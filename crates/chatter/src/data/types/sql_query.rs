@@ -18,6 +18,12 @@ pub struct SqlQuery {
     #[builder(setter(custom))]
     pub sk: String,
 
+    /// `SqlQuery#<query_id>`
+    /// This is the partition key for the GSI1 index
+    /// This is used to query for a specific query regardless of the thread
+    #[builder(setter(custom))]
+    pub gsi1pk: String,
+
     /// A user-friendly name for the query
     pub query_name: String,
 
@@ -47,6 +53,7 @@ impl SqlQueryBuilder {
     /// Custom setter for `query_id` that sets `sk` automatically.
     pub fn query_id(&mut self, query_id: &str) -> &mut Self {
         self.sk = Some(format!("SqlQuery#{}", query_id));
+        self.gsi1pk = Some(format!("SqlQuery#{}", query_id));
         self
     }
 }
@@ -77,7 +84,7 @@ impl SqlQuery {
         query_content: &str,
     ) -> Result<Self> {
         // First retrieve the existing query
-        let mut query = Self::get_query(db, thread_id, query_id).await?;
+        let mut query = Self::get_thread_query(db, thread_id, query_id).await?;
 
         query.query_content = query_content.to_string();
 
@@ -89,8 +96,8 @@ impl SqlQuery {
         Ok(query)
     }
 
-    /// Get a specific SQL query by ID
-    pub async fn get_query(db: &Db, thread_id: &str, query_id: &str) -> Result<Self> {
+    /// Get a specific SQL query by ID in a thread
+    pub async fn get_thread_query(db: &Db, thread_id: &str, query_id: &str) -> Result<Self> {
         let item = db
             .client
             .get_item()
@@ -101,6 +108,33 @@ impl SqlQuery {
             .await?
             .item;
 
+        if let Some(item) = item {
+            let query = db.from_item(item).await?;
+            Ok(query)
+        } else {
+            Err(DataError::DocumentNotFound)
+        }
+    }
+
+    /// Get a specific SQL query by ID
+    pub async fn get_query(db: &Db, query_id: &str) -> Result<Self> {
+        let items = db
+            .client
+            .query()
+            .table_name(&db.table_name)
+            .index_name("gsi1")
+            .key_condition_expression("#gsi1pk = :gsi1pk")
+            .expression_attribute_names("#gsi1pk", "gsi1pk")
+            .expression_attribute_values(
+                ":gsi1pk",
+                AttributeValue::S(format!("SqlQuery#{}", query_id)),
+            )
+            .limit(1)
+            .send()
+            .await?
+            .items;
+
+        let item = items.and_then(|items| items.into_iter().next());
         if let Some(item) = item {
             let query = db.from_item(item).await?;
             Ok(query)
