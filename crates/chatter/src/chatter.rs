@@ -209,6 +209,14 @@ impl Chatter {
         Ok(results)
     }
 
+    pub async fn get_query_results(&mut self, query_id: &str) -> Result<Vec<QueryResultRow>> {
+        let query_obj = SqlQuery::get_query(&self.ddb_client, query_id)
+            .await
+            .map_err(|e| ChatterError::QueryError(e.to_string()))?;
+        let query_str = query_obj.query_content;
+        self.execute_raw_query(&query_str).await
+    }
+
     /// Execute a SQL query for a given XYZ tile and return the result as a MVT binary.
     /// Note: the query's geometry column must be named "geom" and the ID column must be named "ogc_fid".
     pub async fn get_tile(&mut self, query_id: &str, z: i32, x: i32, y: i32) -> Result<Vec<u8>> {

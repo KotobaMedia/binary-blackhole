@@ -26,6 +26,7 @@ import {
 } from "react-bootstrap-icons";
 import "./table.scss";
 import { Form } from "react-bootstrap";
+import { useQueryResults } from "../../tools/query";
 
 const LayerTableView: React.FC<{
   layer: SQLLayer;
@@ -54,14 +55,15 @@ const LayerTableView: React.FC<{
     },
     [],
   );
-  // const { data: resp } = useQuery(layer.sql);
+  const { data: resp } = useQueryResults(layer.id);
   const [data, columns] = useMemo(() => {
-    // if (!resp || resp.data.features.length === 0) {
-    return [[], []];
-    // }
-    const features: GeoJSON.Feature[] = []; // resp.data.features;
-    const columnHelper = createColumnHelper<GeoJSON.Feature>();
-    let columns: ColumnDef<GeoJSON.Feature>[] = [
+    if (!resp || resp.data.length === 0) {
+      return [[], []];
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const columnHelper = createColumnHelper<Record<string, any>>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let columns: ColumnDef<Record<string, any>>[] = [
       {
         id: "select-col",
         size: 30,
@@ -81,16 +83,16 @@ const LayerTableView: React.FC<{
       },
     ];
     columns = columns.concat(
-      Object.keys(features[0].properties!)
+      Object.keys(resp.data[0])
         .filter((key) => !key.startsWith("_"))
         .map((key) =>
-          columnHelper.accessor((row) => (row.properties || {})[key], {
+          columnHelper.accessor((row) => row[key], {
             id: key,
           }),
         ),
     );
-    return [features, columns];
-  }, []);
+    return [resp.data, columns];
+  }, [resp]);
 
   useEffect(() => {
     // Scroll the selected row in to view if it is not visible

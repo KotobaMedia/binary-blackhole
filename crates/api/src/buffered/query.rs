@@ -13,13 +13,31 @@ use serde::Deserialize;
 use serde_json::json;
 
 #[derive(Deserialize)]
-struct GetTileQuery {
+struct QueryString {
     q: String,
+}
+
+async fn get_table_handler(
+    Query(query): Query<QueryString>,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>> {
+    let pg = state.postgres_pool.get().await?;
+    let mut chatter = Chatter::new(pg).await?;
+    let rows: Vec<serde_json::Value> = chatter
+        .get_query_results(&query.q)
+        .await?
+        .into_iter()
+        .map(|row| row.properties)
+        .collect();
+
+    Ok(Json(json!({
+        "data": rows,
+    })))
 }
 
 async fn get_tile_metadata_handler(
     headers: HeaderMap,
-    Query(query): Query<GetTileQuery>,
+    Query(query): Query<QueryString>,
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>> {
     let pg = state.postgres_pool.get().await?;
@@ -60,7 +78,7 @@ async fn get_tile_metadata_handler(
 
 async fn get_tile_handler(
     Path((z, x, y)): Path<(i32, i32, i32)>,
-    Query(query): Query<GetTileQuery>,
+    Query(query): Query<QueryString>,
     State(state): State<AppState>,
 ) -> Result<Response> {
     let pg = state.postgres_pool.get().await?;
@@ -83,6 +101,7 @@ async fn get_tile_handler(
 
 pub fn query_routes() -> Router<AppState> {
     Router::new()
+        .route("/table.json", get(get_table_handler))
         .route("/tile.json", get(get_tile_metadata_handler))
         .route("/tile/{z}/{x}/{y}", get(get_tile_handler))
 }

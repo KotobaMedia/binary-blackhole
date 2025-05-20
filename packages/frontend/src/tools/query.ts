@@ -1,6 +1,7 @@
 ///! Hooks, types, and functions to query the database
 
 import useSWR, { BareFetcher, SWRConfiguration } from "swr";
+import { fetcher } from "./api";
 
 export type QueryResponse = {
   data: GeoJSON.FeatureCollection;
@@ -71,4 +72,27 @@ export const useQueryMetadata = (
     revalidateOnFocus: false,
     ...config,
   });
+};
+
+export type QueryResultsResponse = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Record<string, any>[];
+};
+
+export const useQueryResults = (
+  id: string | undefined,
+  config?: SWRConfiguration<
+    QueryResultsResponse,
+    Error,
+    BareFetcher<QueryResultsResponse>
+  >,
+) => {
+  return useSWR<QueryResultsResponse>(
+    id ? `/table.json?q=${id}` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      ...config,
+    },
+  );
 };

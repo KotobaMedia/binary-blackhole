@@ -1,5 +1,5 @@
 // SWR fetcher function
-export const fetcher = async (url: string) => {
+export const fetcher = async <T>(url: string) => {
   const apiUrl = import.meta.env.VITE_API_URL;
   if (!apiUrl) {
     throw new Error("API URL is not defined");
@@ -8,7 +8,7 @@ export const fetcher = async (url: string) => {
   if (!res.ok) {
     throw new Error("API request failed");
   }
-  return res.json();
+  return res.json() as T;
 };
 
 export async function* streamJsonLines<T>(
