@@ -19,7 +19,7 @@ use serde::Serialize;
 use ulid::Ulid;
 
 async fn get_threads_handler(State(state): State<AppState>) -> Result<Json<ThreadList>> {
-    let threads = ChatThread::get_all_user_threads(&state.db, "demo_user").await?;
+    let threads = ChatThread::get_all_user_threads(&state.ddb, "demo_user").await?;
     let threads: Vec<Thread> = threads.into_iter().map(Into::into).collect();
     Ok(ThreadList { threads }.into())
 }
@@ -28,8 +28,8 @@ async fn get_thread_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ThreadDetails>> {
-    let thread_f = ChatThread::get_thread(&state.db, "demo_user", &id);
-    let messages_f = ChatMessage::get_all_thread_messages(&state.db, "demo_user", &id);
+    let thread_f = ChatThread::get_thread(&state.ddb, "demo_user", &id);
+    let messages_f = ChatMessage::get_all_thread_messages(&state.ddb, "demo_user", &id);
     let (thread, messages) = tokio::try_join!(thread_f, messages_f)?;
 
     Ok(ThreadDetails {
@@ -52,8 +52,8 @@ async fn get_thread_full_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ThreadDetailsFull>> {
-    let thread_f = ChatThread::get_thread(&state.db, "demo_user", &id);
-    let messages_f = ChatMessage::get_all_thread_messages(&state.db, "demo_user", &id);
+    let thread_f = ChatThread::get_thread(&state.ddb, "demo_user", &id);
+    let messages_f = ChatMessage::get_all_thread_messages(&state.ddb, "demo_user", &id);
     let (thread, messages) = tokio::try_join!(thread_f, messages_f)?;
 
     Ok(ThreadDetailsFull {
@@ -78,7 +78,7 @@ async fn create_new_thread_handler(State(state): State<AppState>) -> Result<Resp
         .title(thread_id.to_string())
         .modified_ts(Utc::now())
         .build()?;
-    state.db.put_item_excl(&thread).await?;
+    state.ddb.put_item_excl(&thread).await?;
 
     Ok((
         StatusCode::CREATED,
@@ -94,12 +94,13 @@ async fn archive_thread_handler(
     Path(id): Path<String>,
 ) -> Result<Response> {
     let thread_id = Ulid::from_string(&id).context("Invalid thread ID")?;
-    let mut thread = ChatThread::get_thread(&state.db, "demo_user", &thread_id.to_string()).await?;
+    let mut thread =
+        ChatThread::get_thread(&state.ddb, "demo_user", &thread_id.to_string()).await?;
     let ts = thread.modified_ts;
     thread.archived = Some(true);
     thread.modified_ts = Utc::now();
 
-    state.db.put_item_lock(&thread, "modified_ts", &ts).await?;
+    state.ddb.put_item_lock(&thread, "modified_ts", &ts).await?;
 
     Ok(StatusCode::NO_CONTENT.into_response())
 }

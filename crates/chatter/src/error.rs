@@ -10,6 +10,10 @@ pub enum ChatterError {
     EnvError(#[from] std::env::VarError),
     #[error(transparent)]
     SerializationError(#[from] serde_json::Error),
+    #[error(transparent)]
+    DeadpoolPostgresPoolError(#[from] deadpool_postgres::PoolError),
+    #[error(transparent)]
+    DeadpoolPostgresCreatePoolError(#[from] deadpool_postgres::CreatePoolError),
 
     #[error("Failed to create function execution context failed: {0}")]
     ExecutionContextBuilderError(#[from] crate::functions::ExecutionContextBuilderError),

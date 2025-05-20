@@ -14,11 +14,7 @@ use async_openai::types::{
 use async_stream::try_stream;
 use futures::Stream;
 use geo_types::Geometry;
-use std::{
-    env,
-    sync::{Arc, Mutex},
-};
-use tokio_postgres::NoTls;
+use std::sync::{Arc, Mutex};
 
 pub struct QueryResultRow {
     pub geom: Geometry,
@@ -30,29 +26,15 @@ pub struct Chatter {
     pub context: Arc<Mutex<ChatterContext>>,
     pub client: async_openai::Client<async_openai::config::OpenAIConfig>,
     pub ddb_client: Arc<crate::data::dynamodb::Db>,
-    pub pg_client: Arc<tokio_postgres::Client>,
+    pub pg_client: Arc<deadpool_postgres::Client>,
 
     func_ctx: ExecutionContext,
 }
 
 impl Chatter {
-    pub async fn new() -> Result<Self> {
-        let config = env::var("POSTGRES_CONN_STR")?;
-        let (pg_client, connection) = tokio_postgres::connect(&config, NoTls).await?;
+    pub async fn new(pg_client: deadpool_postgres::Client) -> Result<Self> {
         let pg_client = Arc::new(pg_client);
-
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                panic!("Postgres connection error: {}", e);
-            }
-        });
-
-        pg_client
-            .batch_execute("SET statement_timeout = 10000")
-            .await?;
-
         let ddb_client = Arc::new(crate::data::dynamodb::Db::new().await);
-
         let context = Arc::new(Mutex::new(ChatterContext::new()));
 
         let func_ctx = ExecutionContextBuilder::default()
@@ -361,18 +343,37 @@ impl Chatter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use deadpool_postgres::{Config, ManagerConfig, PoolConfig, RecyclingMethod, Runtime};
     use geo_types::Point;
     use serde_json::Value;
+    use std::env;
+    use tokio_postgres::NoTls;
+
+    async fn setup() -> Result<Chatter> {
+        let mut cfg = Config::new();
+        let config = env::var("POSTGRES_CONN_STR")?;
+        cfg.url = Some(config);
+        cfg.pool = Some(PoolConfig {
+            max_size: 1,
+            ..Default::default()
+        });
+        cfg.manager = Some(ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        });
+        let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
+        let pg_client = pool.get().await?;
+        Chatter::new(pg_client).await
+    }
 
     #[tokio::test]
     async fn test_chatter() -> Result<()> {
-        Chatter::new().await?;
+        setup().await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn test_execute_query() -> Result<()> {
-        let mut chatter = Chatter::new().await?;
+        let mut chatter = setup().await?;
         // some data we just create for the test
         let rows = chatter
             .execute_raw_query(

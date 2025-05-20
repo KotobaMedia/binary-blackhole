@@ -1,18 +1,19 @@
 use super::{query, threads};
 use crate::error::Result as AppResult;
 use crate::state::AppState;
-use axum::Router;
 use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::get;
+use axum::{Router, extract::State};
 use chatter::chatter::Chatter;
 use tower_http::cors::{Any, CorsLayer};
 
 async fn root() -> Redirect {
     Redirect::temporary("https://www.bblackhole.com/")
 }
-async fn health() -> AppResult<String> {
-    let mut chatter = Chatter::new().await?;
+async fn health(State(state): State<AppState>) -> AppResult<String> {
+    let pg = state.postgres_pool.get().await?;
+    let mut chatter = Chatter::new(pg).await?;
     let rows = chatter
         .execute_raw_query(
             r#"

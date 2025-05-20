@@ -34,19 +34,20 @@ async fn create_thread_message_handler(
 ) -> impl IntoResponse {
     let thread_id = Ulid::from_string(&id).context("Invalid thread ID")?;
 
-    let thread = ChatThread::get_thread(&state.db, "demo_user", &thread_id.to_string()).await?;
+    let thread = ChatThread::get_thread(&state.ddb, "demo_user", &thread_id.to_string()).await?;
     if thread.archived.unwrap_or(false) == true {
         return Err(AppError::Conflict("thread_archived".to_string()));
     }
 
     // Get the messages for the thread so we can re-instantiate the context
     let messages =
-        ChatMessage::get_all_thread_messages(&state.db, "demo_user", &thread_id.to_string())
+        ChatMessage::get_all_thread_messages(&state.ddb, "demo_user", &thread_id.to_string())
             .await?;
     let thread_message_count = messages.len() as u32;
 
     let stream = {
-        let mut chatter = Chatter::new().await?;
+        let pg = state.postgres_pool.get().await?;
+        let mut chatter = Chatter::new(pg).await?;
         if !messages.is_empty() {
             let ctx = ChatterContext::new_with_stored(
                 thread_id.to_string(),
@@ -65,12 +66,12 @@ async fn create_thread_message_handler(
         //     .user_id("demo_user".to_string())
         //     .msg(msg.clone());
         // let message = binding.build()?;
-        // state.db.put_item_excl(&message).await?;
+        // state.ddb.put_item_excl(&message).await?;
 
         chatter.execute_stream()
     };
 
-    let db = state.db.clone();
+    let db = state.ddb.clone();
     let stream = stream
         .enumerate()
         .map(move |(i, m)| {

@@ -3,7 +3,7 @@ use crate::state::AppState;
 use anyhow::Context;
 use axum::{
     Json, Router,
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
@@ -20,8 +20,10 @@ struct GetTileQuery {
 async fn get_tile_metadata_handler(
     headers: HeaderMap,
     Query(query): Query<GetTileQuery>,
+    State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>> {
-    let mut chatter = Chatter::new().await?;
+    let pg = state.postgres_pool.get().await?;
+    let mut chatter = Chatter::new(pg).await?;
 
     let bbox = chatter
         .get_query_bbox(&query.q)
@@ -59,8 +61,10 @@ async fn get_tile_metadata_handler(
 async fn get_tile_handler(
     Path((z, x, y)): Path<(i32, i32, i32)>,
     Query(query): Query<GetTileQuery>,
+    State(state): State<AppState>,
 ) -> Result<Response> {
-    let mut chatter = Chatter::new().await?;
+    let pg = state.postgres_pool.get().await?;
+    let mut chatter = Chatter::new(pg).await?;
 
     let tile = chatter
         .get_tile(&query.q, z, x, y)

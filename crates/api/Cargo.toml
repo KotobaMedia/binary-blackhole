@@ -18,7 +18,9 @@ required-features = ["streaming"]
 chatter = { path = "../chatter" }
 
 lambda_http = { version = "0.13.0", default-features = false, features = ["apigw_http", "tracing"] }
-tokio = { version = "1", features = ["macros"] }
+tokio = { workspace = true }
+tokio-postgres = { workspace = true }
+deadpool-postgres = { workspace = true }
 
 axum = { version = "0.8.1", features = ["macros"] }
 serde = { version = "1.0.217", features = ["derive"] }

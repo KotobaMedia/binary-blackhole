@@ -24,7 +24,7 @@ pub struct ExecutionContext {
     /// The context of the chat.
     chatter_context: Arc<Mutex<ChatterContext>>,
 
-    pg: Arc<tokio_postgres::Client>,
+    pg: Arc<deadpool_postgres::Client>,
     ddb: Arc<Db>,
 }
 

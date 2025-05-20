@@ -8,3 +8,9 @@ package.authors = [
 members = [
   "crates/api", "crates/chatter",
 ]
+
+[workspace.dependencies]
+
+tokio = { version = "1", features = ["macros", "sync"] }
+tokio-postgres = { version = "0.7", features = ["with-geo-types-0_7", "with-serde_json-1"] }
+deadpool-postgres = { version = "0.14", features = ["rt_tokio_1"] }

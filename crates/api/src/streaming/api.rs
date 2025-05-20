@@ -3,6 +3,7 @@ use crate::error::Result as AppResult;
 use crate::state::AppState;
 use async_stream::stream;
 use axum::body::Body;
+use axum::extract::State;
 use axum::http::{Method, StatusCode, header};
 use axum::response::IntoResponse;
 use axum::{Router, routing::get};
@@ -10,8 +11,9 @@ use chatter::chatter::Chatter;
 use std::convert::Infallible;
 use tower_http::cors::{Any, CorsLayer};
 
-async fn health() -> AppResult<impl IntoResponse> {
-    let mut chatter = Chatter::new().await?;
+async fn health(State(state): State<AppState>) -> AppResult<impl IntoResponse> {
+    let pg = state.postgres_pool.get().await?;
+    let mut chatter = Chatter::new(pg).await?;
     let rows = chatter
         .execute_raw_query(
             r#"
