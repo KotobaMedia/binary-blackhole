@@ -28,6 +28,7 @@ impl ChatterContext {
 
     /// Instantiate a new context with stored messages.
     /// This is used when a user returns to a previous conversation.
+    /// Note that these messages should not include the system message.
     pub fn new_with_stored(id: String, messages: Vec<ChatterMessage>) -> Self {
         Self {
             id,

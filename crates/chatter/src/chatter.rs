@@ -60,6 +60,8 @@ impl Chatter {
     }
 
     /// Switch the internal context with an already instantiated ChatterContext.
+    /// This is used when a user returns to a previous conversation.
+    /// Note that these messages should not include the system message -- it will be added in this function.
     pub async fn switch_context(&mut self, mut context: ChatterContext) -> Result<()> {
         // because the context doesn't have the system message, we will add it here.
         let system_message = ChatterMessage::create_system_message(&self.pg_client).await?;
