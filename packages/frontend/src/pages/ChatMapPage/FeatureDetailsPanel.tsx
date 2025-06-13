@@ -100,20 +100,14 @@ const LayerTableView: React.FC<{
     if (selectedRow) {
       const tableBody = selectedRow.closest(".table-responsive");
       if (tableBody) {
-        // debugger;
-        const { top, bottom } = selectedRow.getBoundingClientRect();
-        const { top: tableTop, bottom: tableBottom } =
-          tableBody.getBoundingClientRect();
-        if (top < tableTop || bottom > tableBottom) {
-          selectedRow.scrollIntoView({
-            behavior: "auto",
-            block: "center",
-            inline: "nearest",
-          });
-        }
+        selectedRow.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        });
       }
     }
-  }, [rowSelection]);
+  }, [rowSelection, selectedFeatures]);
 
   const table = useReactTable({
     data,

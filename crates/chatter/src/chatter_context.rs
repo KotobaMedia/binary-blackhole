@@ -33,7 +33,8 @@ impl ChatterContext {
         Self {
             id,
             messages,
-            model: "gpt-4o".to_string(),
+            // model: "gpt-4o".to_string(),
+            model: "gpt-4.1".to_string(),
             tools: vec![
                 ExecutionContext::describe_tables_tool(),
                 ExecutionContext::query_database_tool(),
