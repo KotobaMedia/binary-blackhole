@@ -1,3 +1,4 @@
 pub mod api;
-mod query;
-mod threads;
+pub mod data_requests;
+pub mod query;
+pub mod threads;

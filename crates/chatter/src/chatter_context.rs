@@ -38,6 +38,7 @@ impl ChatterContext {
             tools: vec![
                 ExecutionContext::describe_tables_tool(),
                 ExecutionContext::query_database_tool(),
+                ExecutionContext::request_unavailable_data_tool(),
             ],
         }
     }

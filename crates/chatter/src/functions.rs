@@ -3,6 +3,7 @@
 use crate::chatter_context::ChatterContext;
 use crate::chatter_message::SQLExecutionDetails;
 use crate::data::dynamodb::Db;
+use crate::data::types::data_request::{DataRequest, DataRequestBuilder};
 use crate::data::types::sql_query::SqlQueryBuilder;
 use crate::pg_helpers::{check_query, validate_query_rows};
 use crate::rows_to_tsv::rows_to_tsv;
@@ -11,6 +12,7 @@ use crate::{
     error::Result,
 };
 use async_openai::types::{ChatCompletionTool, ChatCompletionToolType, FunctionObject, Role};
+use chrono::Utc;
 use derive_builder::Builder;
 use km_to_sql::metadata::ColumnMetadata;
 use schemars::{JsonSchema, schema_for};
@@ -47,6 +49,15 @@ pub struct QueryDatabaseParams {
     query: String,
 }
 
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct RequestUnavailableDataParams {
+    /// The name of the data that is unavailable.
+    name: String,
+    /// An explanation of why the data would be relevant to the user.
+    explanation: String,
+}
+
 fn format_column(column: &ColumnMetadata) -> String {
     let mut out = format!("  - `{}`", column.name);
     if let Some(ref desc) = column.desc {
@@ -79,6 +90,63 @@ fn format_column(column: &ColumnMetadata) -> String {
 impl ExecutionContext {
     pub fn update_context(&mut self, chatter_context: Arc<Mutex<ChatterContext>>) {
         self.chatter_context = chatter_context;
+    }
+
+    fn request_unavailable_data_definition() -> FunctionObject {
+        let parameters_schema = json!(schema_for!(RequestUnavailableDataParams));
+        FunctionObject {
+            name: "request_unavailable_data".into(),
+            description: Some("Puts in a request for data that is currently unavailable.".into()),
+            parameters: Some(parameters_schema),
+            strict: Some(true),
+        }
+    }
+
+    pub fn request_unavailable_data_tool() -> ChatCompletionTool {
+        ChatCompletionTool {
+            r#type: ChatCompletionToolType::Function,
+            function: Self::request_unavailable_data_definition(),
+        }
+    }
+
+    pub async fn request_unavailable_data(
+        &self,
+        tool_call_id: &str,
+        params: RequestUnavailableDataParams,
+    ) -> Result<ChatterMessage> {
+        // Get the thread ID from the context
+        let thread_id = {
+            let chatter_context = self.chatter_context.lock().unwrap();
+            chatter_context.id.clone()
+        };
+
+        // Create a new data request
+        let request = DataRequestBuilder::default()
+            .thread_and_request_ids(&thread_id, &ulid::Ulid::new().to_string())
+            .name(params.name.clone())
+            .explanation(params.explanation)
+            .created_ts(Utc::now())
+            .status("pending".to_string())
+            .build()
+            .map_err(|e| crate::error::ChatterError::DataRequestCreationError(e.to_string()))?;
+
+        // Store the request in DynamoDB
+        self.ddb
+            .put_item(&request)
+            .await
+            .map_err(|e| crate::error::ChatterError::DataRequestCreationError(e.to_string()))?;
+
+        Ok(ChatterMessage {
+            message: Some(format!(
+                "I've submitted a request for the data '{}'. The data team will review this request and get back to you. Request ID: {}",
+                params.name,
+                request.id()
+            )),
+            role: Role::Tool,
+            tool_calls: None,
+            tool_call_id: Some(tool_call_id.into()),
+            sidecar: ChatterMessageSidecar::None,
+        })
     }
 
     fn describe_tables_definition() -> FunctionObject {

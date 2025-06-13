@@ -168,6 +168,11 @@ impl Chatter {
                 let response = self.func_ctx.query_database(&id, args).await?;
                 Ok(response)
             }
+            "request_unavailable_data" => {
+                let args = serde_json::from_str(&call.arguments)?;
+                let response = self.func_ctx.request_unavailable_data(&id, args).await?;
+                Ok(response)
+            }
             other => Err(crate::error::ChatterError::UnknownToolCall(
                 other.to_string(),
             )),
