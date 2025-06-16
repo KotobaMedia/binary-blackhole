@@ -3,7 +3,7 @@
 use crate::chatter_context::ChatterContext;
 use crate::chatter_message::SQLExecutionDetails;
 use crate::data::dynamodb::Db;
-use crate::data::types::data_request::{DataRequest, DataRequestBuilder};
+use crate::data::types::data_request::DataRequestBuilder;
 use crate::data::types::sql_query::SqlQueryBuilder;
 use crate::pg_helpers::{check_query, validate_query_rows};
 use crate::rows_to_tsv::rows_to_tsv;
