@@ -3,7 +3,7 @@ use crate::{
     chatter_message::ChatterMessage,
     data::types::sql_query::SqlQuery,
     error::{ChatterError, Result},
-    functions::{ExecutionContext, ExecutionContextBuilder},
+    functions::{FunctionRegistry, SharedResources},
     geom::GeometryWrapper,
     pg_helpers::convert_column_value,
 };
@@ -28,7 +28,8 @@ pub struct Chatter {
     pub ddb_client: Arc<crate::data::dynamodb::Db>,
     pub pg_client: Arc<deadpool_postgres::Client>,
 
-    func_ctx: ExecutionContext,
+    resources: SharedResources,
+    function_registry: Arc<FunctionRegistry>,
 }
 
 impl Chatter {
@@ -37,25 +38,32 @@ impl Chatter {
         let ddb_client = Arc::new(crate::data::dynamodb::Db::new().await);
         let context = Arc::new(Mutex::new(ChatterContext::new()));
 
-        let func_ctx = ExecutionContextBuilder::default()
-            .pg(pg_client.clone())
-            .ddb(ddb_client.clone())
-            .chatter_context(context.clone())
-            .build()?;
+        let resources = SharedResources {
+            chatter_context: context.clone(),
+            pg: pg_client.clone(),
+            ddb: ddb_client.clone(),
+        };
+
+        let mut function_registry = FunctionRegistry::new();
+        function_registry.register(crate::functions::DescribeTablesFunction);
+        function_registry.register(crate::functions::QueryDatabaseFunction);
+        function_registry.register(crate::functions::RequestUnavailableDataFunction);
 
         Ok(Self {
             context,
             client: async_openai::Client::new(),
             pg_client,
             ddb_client,
-            func_ctx,
+            resources,
+            function_registry: Arc::new(function_registry),
         })
     }
 
     /// Create a new context with default parameters. The Chatter's internal context
     /// will be replaced with the new context.
     pub async fn new_context(&mut self) -> Result<()> {
-        let ctx = ChatterContext::new();
+        let mut ctx = ChatterContext::new();
+        ctx.tools = self.function_registry.get_tools();
         self.switch_context(ctx).await
     }
 
@@ -67,10 +75,13 @@ impl Chatter {
         let system_message = ChatterMessage::create_system_message(&self.pg_client).await?;
         context.messages.insert(0, system_message);
 
+        // Set the tools from the function registry
+        context.tools = self.function_registry.get_tools();
+
         // Set the new context
         self.context = Arc::new(Mutex::new(context));
-        // Update the function context with the new context
-        self.func_ctx.update_context(self.context.clone());
+        // Update the resources with the new context
+        self.resources.chatter_context = self.context.clone();
 
         Ok(())
     }
@@ -127,7 +138,8 @@ impl Chatter {
         let request = {
             let context = self.context.lock().unwrap();
             // Create the chat completion request
-            CreateChatCompletionRequestArgs::default()
+            let mut builder = CreateChatCompletionRequestArgs::default();
+            builder
                 .max_completion_tokens(2048u32)
                 .model(&context.model)
                 .messages(
@@ -137,12 +149,14 @@ impl Chatter {
                         .map(|m| m.clone().try_into())
                         .collect::<Result<Vec<ChatCompletionRequestMessage>>>()?,
                 )
-                .tools(context.tools.clone())
-                // The following two options are supported by gpt-4o, but not o3-mini
-                // .temperature(0.2)
-                // .parallel_tool_calls(false) // We only want to run one tool at a time
+                .tools(context.tools.clone());
+            // The following two options are supported by gpt-4o, but not o3-mini
+            // builder.temperature(0.2);
+            // builder.parallel_tool_calls(false); // We only want to run one tool at a time
+            builder
                 .build()
-        }?;
+                .map_err(|e| ChatterError::OpenAIError(e.into()))?
+        };
         // Send the request and get the response
         let response = self.client.chat().create(request).await?;
         let choice = response.choices[0].clone();
@@ -157,26 +171,10 @@ impl Chatter {
     ) -> Result<ChatterMessage> {
         let call = tool_call.function;
         let id = tool_call.id;
-        match call.name.as_str() {
-            "describe_tables" => {
-                let args = serde_json::from_str(&call.arguments)?;
-                let response = self.func_ctx.describe_tables(&id, args).await?;
-                Ok(response)
-            }
-            "query_database" => {
-                let args = serde_json::from_str(&call.arguments)?;
-                let response = self.func_ctx.query_database(&id, args).await?;
-                Ok(response)
-            }
-            "request_unavailable_data" => {
-                let args = serde_json::from_str(&call.arguments)?;
-                let response = self.func_ctx.request_unavailable_data(&id, args).await?;
-                Ok(response)
-            }
-            other => Err(crate::error::ChatterError::UnknownToolCall(
-                other.to_string(),
-            )),
-        }
+        let args = serde_json::from_str(&call.arguments)?;
+        self.function_registry
+            .execute(&self.resources, &call.name, id, args)
+            .await
     }
 
     /// Execute a SQL query and return the result. Used by the API to execute queries.

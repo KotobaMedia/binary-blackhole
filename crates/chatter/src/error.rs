@@ -15,9 +15,6 @@ pub enum ChatterError {
     #[error(transparent)]
     DeadpoolPostgresCreatePoolError(#[from] deadpool_postgres::CreatePoolError),
 
-    #[error("Failed to create function execution context failed: {0}")]
-    ExecutionContextBuilderError(#[from] crate::functions::ExecutionContextBuilderError),
-
     #[error("Unknown Tool Call: {0}")]
     UnknownToolCall(String),
     #[error("Unknown Role: {0}")]
@@ -35,6 +32,9 @@ pub enum ChatterError {
     SqlQueryCreationError(String),
     #[error("Data request creation error: {0}")]
     DataRequestCreationError(String),
+
+    #[error("Function not found: {0}")]
+    FunctionNotFound(String),
 }
 
 pub type Result<T> = std::result::Result<T, ChatterError>;

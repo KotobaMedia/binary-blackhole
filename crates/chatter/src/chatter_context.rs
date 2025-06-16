@@ -3,7 +3,7 @@ use async_openai::types::{ChatCompletionTool, Role};
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
-use crate::{chatter_message::ChatterMessage, functions::ExecutionContext};
+use crate::chatter_message::ChatterMessage;
 
 /// A context is a collection of messages and tools that are used to interact with the LLM.
 /// It is used to track the conversation history and the tools that are available to the LLM.
@@ -35,11 +35,7 @@ impl ChatterContext {
             messages,
             // model: "gpt-4o".to_string(),
             model: "gpt-4.1".to_string(),
-            tools: vec![
-                ExecutionContext::describe_tables_tool(),
-                ExecutionContext::query_database_tool(),
-                ExecutionContext::request_unavailable_data_tool(),
-            ],
+            tools: vec![], // Tools will be set by the Chatter
         }
     }
 
