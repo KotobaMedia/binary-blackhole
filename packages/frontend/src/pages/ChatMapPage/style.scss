@@ -1,15 +1,7 @@
 .chat-map-page-container {
-    transform: translate3d(0, 0, 0);
-    transition: transform 0.3s ease;
-
-    &.slide-left {
-        transform: translate3d(-50%, 0, 0);
-    }
-    &.fullscreen {
-        transform: translate3d(-100%, 0, 0);
-    }
-
     .detail-pane {
-        transition: width 0.3s ease;
+        height: 300px;
+        overflow-y: auto;
+        border-top: 1px solid #dee2e6;
     }
 }

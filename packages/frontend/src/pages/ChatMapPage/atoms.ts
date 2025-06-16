@@ -42,4 +42,3 @@ export const enabledLayersAtom = atom<SQLLayer[]>((get) => {
 export const selectedFeaturesAtom = atom<SelectedFeatureInfo[]>([]);
 
 export const detailPaneVisibleAtom = atom(false);
-export const detailPaneFullscreenAtom = atom(false);

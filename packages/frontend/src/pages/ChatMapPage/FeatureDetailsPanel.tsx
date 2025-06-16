@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import c from "classnames";
 import {
-  detailPaneFullscreenAtom,
   detailPaneVisibleAtom,
   enabledLayersAtom,
   selectedFeaturesAtom,
@@ -19,11 +18,7 @@ import {
   RowSelectionState,
   useReactTable,
 } from "@tanstack/react-table";
-import {
-  ArrowsCollapseVertical,
-  ArrowsExpandVertical,
-  X,
-} from "react-bootstrap-icons";
+import { X } from "react-bootstrap-icons";
 import "./table.scss";
 import { Form } from "react-bootstrap";
 import { useQueryResults } from "../../tools/query";
@@ -197,7 +192,6 @@ const LayerTableView: React.FC<{
 
 const FeatureDetailsPanel: React.FC = () => {
   const setVisible = useSetAtom(detailPaneVisibleAtom);
-  const [fullscreen, setFullscreen] = useAtom(detailPaneFullscreenAtom);
   const [selectedLayer, setSelectedLayer] = useState<SQLLayer | undefined>(
     undefined,
   );
@@ -229,9 +223,6 @@ const FeatureDetailsPanel: React.FC = () => {
     <div className="feature-details-panel h-100 d-flex flex-column px-3">
       <nav className="navbar">
         <div className="container-fluid">
-          <button className="btn" onClick={() => setFullscreen((x) => !x)}>
-            {fullscreen ? <ArrowsCollapseVertical /> : <ArrowsExpandVertical />}
-          </button>
           <div>
             <NavDropdown title={selectedLayer?.name} id="layer-dropdown">
               {layers.map((layer) => (
@@ -249,7 +240,6 @@ const FeatureDetailsPanel: React.FC = () => {
             className="btn"
             onClick={() => {
               setVisible(false);
-              setFullscreen(false);
             }}
           >
             <X />

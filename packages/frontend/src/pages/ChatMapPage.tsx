@@ -1,33 +1,22 @@
 import React from "react";
-import c from "classnames";
 import ChatBox from "./ChatMapPage/ChatBox";
 import MainMap from "./ChatMapPage/MainMap";
 import LayerSelector from "./ChatMapPage/LayerSelector";
 import { useAtomValue } from "jotai";
-import {
-  detailPaneFullscreenAtom,
-  detailPaneVisibleAtom,
-} from "./ChatMapPage/atoms";
-// import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
+import { detailPaneVisibleAtom } from "./ChatMapPage/atoms";
 import "./ChatMapPage/style.scss";
 import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
 
 const ChatMapPage: React.FC = () => {
   const detailPaneVisible = useAtomValue(detailPaneVisibleAtom);
-  const detailPaneFullscreen = useAtomValue(detailPaneFullscreenAtom);
 
   return (
     <div className="container-fluid overflow-hidden">
-      <div
-        className={c("row vh-100 vw-100 flex-nowrap chat-map-page-container", {
-          "slide-left": detailPaneVisible,
-          fullscreen: detailPaneFullscreen,
-        })}
-      >
-        <div className={c("col-6 p-0 h-100")}>
+      <div className="row vh-100 vw-100 flex-nowrap chat-map-page-container">
+        <div className="col-4 p-0 h-100">
           <ChatBox />
         </div>
-        <div className="col-6 p-0">
+        <div className="col-8 p-0">
           <div className="d-flex flex-column h-100">
             <div className="d-flex flex-wrap px-2 py-1 bg-danger text-center align-items-center justify-content-center">
               <span>
@@ -56,15 +45,12 @@ const ChatMapPage: React.FC = () => {
               <MainMap />
             </div>
             <LayerSelector />
+            {detailPaneVisible && (
+              <div className="detail-pane">
+                <FeatureDetailsPanel />
+              </div>
+            )}
           </div>
-        </div>
-        <div
-          className={c("p-0 detail-pane h-100", {
-            "col-6": !detailPaneFullscreen,
-            "col-12": detailPaneFullscreen,
-          })}
-        >
-          <FeatureDetailsPanel />
         </div>
       </div>
     </div>
