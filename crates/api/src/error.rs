@@ -6,6 +6,7 @@ use axum::{
 #[cfg(feature = "streaming")]
 use futures::stream;
 use lambda_http::tracing;
+use sentry::integrations::anyhow::capture_anyhow;
 use serde_json::json;
 use std::{convert::Infallible, fmt};
 
@@ -23,6 +24,10 @@ impl IntoResponse for AppError {
         let (status, message) = match self {
             AppError::InternalServerError(error) => {
                 tracing::error!("Unhandled error: {:?}", error);
+
+                // Capture error in Sentry
+                capture_anyhow(&error);
+
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Something went wrong. Please try again later.".to_string(),

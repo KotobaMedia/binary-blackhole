@@ -37,6 +37,11 @@ tokio-stream = { workspace = true, optional = true }
 async-stream = { workspace = true, optional = true }
 urlencoding = "2.1.3"
 
+# Sentry dependencies
+sentry = { version = "0.40", default-features = false, features = ["anyhow", "tracing", "backtrace", "panic", "reqwest", "rustls"] }
+sentry-tracing = { version = "0.40" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
 [features]
 all = ["streaming"]
 streaming = ["dep:tokio-stream", "dep:futures", "dep:async-stream"]

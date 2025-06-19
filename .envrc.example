@@ -11,3 +11,4 @@ export TABLE_NAME="bbh-local"
 
 # For deployment
 export RDS_PASSWORD_Dev="..."
+export SENTRY_DSN_Dev="..."

@@ -38,6 +38,7 @@ export class API extends Construct {
 
     const apiUrl = process.env[`API_URL_${getStageName(this)}`];
     const appUrl = process.env[`APP_URL_${getStageName(this)}`];
+    const sentryDsn = process.env[`SENTRY_DSN_${getStageName(this)}`];
 
     this.apiFn = new RustFunction(this, "API", {
       binaryName: "api",
@@ -49,6 +50,7 @@ export class API extends Construct {
         OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
         API_URL: apiUrl ?? "",
         APP_URL: appUrl ?? "",
+        SENTRY_DSN: sentryDsn ?? "",
       },
       memorySize: 512,
       timeout: Duration.seconds(30),

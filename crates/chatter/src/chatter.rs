@@ -285,7 +285,7 @@ impl Chatter {
                 -- 3) only intersect in 4326 (uses index on source.geom), then reproject+clip
                 tile_raw AS (
                 SELECT
-                    "{id_column_name}",
+                    "{id_column_name}"::bigint,
                     ST_AsMVTGeom(
                         ST_Transform("source"."{geom_column_name}", 3857),
                         params.env_3857,
