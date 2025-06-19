@@ -1,0 +1,12 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Package Manager
+
+- Always use `pnpm` for managing NPM packages.
+
+# Code Design
+
+- Prefer simple solutions. Don't "reinvent the wheel" - use libraries when available.

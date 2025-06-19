@@ -1,11 +1,14 @@
-use super::{data_requests, query, threads};
+use super::{data_requests, datasets, query, threads};
 use crate::error::Result as AppResult;
 use crate::state::AppState;
+use axum::Json;
 use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::get;
 use axum::{Router, extract::State};
 use chatter::chatter::Chatter;
+use km_to_sql::metadata::TableMetadata;
+use serde::Serialize;
 use tower_http::cors::{Any, CorsLayer};
 
 async fn root() -> Redirect {
@@ -46,6 +49,7 @@ pub async fn create_api() -> Router {
     Router::new()
         .route("/", get(root))
         .route("/__health", get(health))
+        .merge(datasets::routes())
         .merge(threads::threads_routes())
         .merge(query::query_routes())
         .merge(data_requests::data_requests_routes())

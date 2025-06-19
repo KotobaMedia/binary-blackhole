@@ -93,6 +93,7 @@ dependencies = [
  "geo",
  "geo-types",
  "geojson",
+ "km-to-sql",
  "lambda_http",
  "sentry",
  "sentry-tracing",
