@@ -15,6 +15,8 @@
         "bootstrap": "^5.3.5",
         "chroma-js": "^3.1.2",
         "classnames": "^2.5.1",
+        "clsx": "^2.1.1",
+        "font-gis": "^1.0.6",
         "jotai": "^2.12.3",
         "katex": "^0.16.22",
         "maplibre-gl": "^5.4.0",
@@ -29,6 +31,7 @@
         "remark-math": "^6.0.0",
         "sql-formatter": "^15.6.1",
         "swr": "^2.3.3",
+        "vite-plugin-svgr": "^4.3.0",
         "wouter": "^3.7.0"
     },
     "devDependencies": {
