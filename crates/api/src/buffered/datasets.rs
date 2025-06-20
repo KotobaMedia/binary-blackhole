@@ -23,6 +23,7 @@ pub async fn index(State(state): State<AppState>) -> AppResult<Json<TableList>> 
         .query(
             r#"
                 SELECT "table_name" FROM "datasets"
+                    ORDER BY "table_name" ASC
             "#,
             &[],
         )

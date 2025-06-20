@@ -1,14 +1,11 @@
 use super::{data_requests, datasets, query, threads};
 use crate::error::Result as AppResult;
 use crate::state::AppState;
-use axum::Json;
 use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::get;
 use axum::{Router, extract::State};
 use chatter::chatter::Chatter;
-use km_to_sql::metadata::TableMetadata;
-use serde::Serialize;
 use tower_http::cors::{Any, CorsLayer};
 
 async fn root() -> Redirect {
