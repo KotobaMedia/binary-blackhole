@@ -336,7 +336,7 @@ const SelectedData: React.FC<SelectedDataProps> = ({
           )}
         </div>
         {selectedTables.length === 0 ? (
-          <div className="text-muted fst-italic mt-3">
+          <div className="text-muted fst-italic my-3">
             テーブルが選択されていません。
           </div>
         ) : (
@@ -520,16 +520,14 @@ const DataNavigatorPage: React.FC = () => {
           </div>
         </div>
         <div className="col-3">
-          {selectedTables.length > 0 && (
-            <div className="sticky-top" style={{ top: "1.5rem" }}>
-              <SelectedData
-                selectedTables={selectedTables}
-                onProceed={handleProceed}
-                onRemoveTable={handleRemoveTable}
-                onClearAll={handleClearAll}
-              />
-            </div>
-          )}
+          <div className="sticky-top" style={{ top: "1.5rem" }}>
+            <SelectedData
+              selectedTables={selectedTables}
+              onProceed={handleProceed}
+              onRemoveTable={handleRemoveTable}
+              onClearAll={handleClearAll}
+            />
+          </div>
         </div>
       </div>
     </div>
