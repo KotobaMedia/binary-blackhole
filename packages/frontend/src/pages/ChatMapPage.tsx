@@ -18,7 +18,7 @@ const ChatMapPage: React.FC = () => {
         </div>
         <div className="col-8 p-0">
           <div className="d-flex flex-column h-100">
-            <div className="d-flex flex-wrap px-2 py-1 bg-danger text-center align-items-center justify-content-center">
+            <div className="d-flex flex-wrap px-2 py-1 bg-danger-subtle text-center align-items-center justify-content-center">
               <span>
                 <strong>
                   EXPERIMENTAL ・ 実験中 ・ すべてのクエリはログされています ・{" "}

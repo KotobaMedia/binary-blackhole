@@ -259,6 +259,8 @@ impl Chatter {
             format!(", {}", extra_columns.join(", "))
         };
 
+        // TODO: given the requested zoom level, filter out features that are too small to be visible. should only be applied to lines and polygons.
+        // points should probably be grouped instead, because a point is technically infinitely small.
         let query = format!(
             r#"
                 WITH
@@ -277,7 +279,7 @@ impl Chatter {
                     )                                                       AS env_4326
                 ),
 
-                -- 2) your auto‐generated subquery goes here
+                -- 2) auto‐generated subquery goes here
                 source AS (
                     {query_str}
                 ),

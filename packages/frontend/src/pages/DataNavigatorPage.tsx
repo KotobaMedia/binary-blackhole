@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import useSWR from "swr";
 import clsx from "clsx";
 import { fetcher } from "../tools/api";
-import { CaretDownFill, CaretRightFill } from "react-bootstrap-icons";
+import {
+  CaretDownFill,
+  CaretRightFill,
+  Table as TableIcon,
+} from "react-bootstrap-icons";
 
 // Types for API response
 interface Column {
@@ -65,8 +69,17 @@ const getGeometryType = (table: Table): "point" | "line" | "polygon" | null => {
 
 // Geometry icon component
 const GeometryIcon: React.FC<{
-  geometryType: "point" | "line" | "polygon";
+  geometryType: "point" | "line" | "polygon" | null;
 }> = ({ geometryType }) => {
+  if (geometryType === null) {
+    return (
+      <TableIcon
+        className="text-body me-2"
+        title="位置情報を持たないテーブル"
+      />
+    );
+  }
+
   const getTitle = () => {
     switch (geometryType) {
       case "point":
@@ -288,7 +301,7 @@ const TableItem: React.FC<TableItemProps> = ({
           >
             {isExpanded ? <CaretDownFill /> : <CaretRightFill />}
           </button>
-          {geometryType && <GeometryIcon geometryType={geometryType} />}
+          <GeometryIcon geometryType={geometryType} />
           <span style={{ minWidth: 200, flex: 1, fontWeight: 500 }}>
             {table.name || table.table_name}
           </span>
