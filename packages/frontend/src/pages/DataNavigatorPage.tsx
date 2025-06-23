@@ -159,8 +159,10 @@ const ColumnTable: React.FC<ColumnTableProps> = ({ columns }) => {
                   {column.foreign_key && (
                     <div className="small">
                       <span className="text-info">外部キー:</span>{" "}
-                      {column.foreign_key.foreign_table}.
-                      {column.foreign_key.foreign_column}
+                      <code>
+                        {column.foreign_key.foreign_table}.
+                        {column.foreign_key.foreign_column}
+                      </code>
                     </div>
                   )}
                   {column.enum_values && column.enum_values.length > 0 && (
@@ -208,41 +210,43 @@ const TableExpandedContent: React.FC<TableExpandedContentProps> = ({
   table,
 }) => {
   return (
-    <div className="my-4">
+    <div className="ps-5 pb-2">
       {/* Table metadata */}
-      {(table.source || table.source_url || table.license) && (
-        <div className="ps-4 pe-2 pb-2">
-          <dl className="row mb-3">
-            {table.source && (
-              <>
-                <dt className="col-sm-3 text-muted">出典:</dt>
-                <dd className="col-sm-9">{table.source}</dd>
-              </>
-            )}
-            {table.source_url && (
-              <>
-                <dt className="col-sm-3 text-muted">出典URL:</dt>
-                <dd className="col-sm-9">
-                  <a
-                    href={table.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary"
-                  >
-                    {table.source_url}
-                  </a>
-                </dd>
-              </>
-            )}
-            {table.license && (
-              <>
-                <dt className="col-sm-3 text-muted">ライセンス:</dt>
-                <dd className="col-sm-9">{table.license}</dd>
-              </>
-            )}
-          </dl>
-        </div>
-      )}
+      <div className="ps-4 pe-2 pb-2">
+        <dl className="row mb-3">
+          <dt className="col-sm-3 text-muted">テーブル名:</dt>
+          <dd className="col-sm-9">
+            <code className="text-primary">{table.table_name}</code>
+          </dd>
+          {table.source && (
+            <>
+              <dt className="col-sm-3 text-muted">出典:</dt>
+              <dd className="col-sm-9">{table.source}</dd>
+            </>
+          )}
+          {table.source_url && (
+            <>
+              <dt className="col-sm-3 text-muted">出典URL:</dt>
+              <dd className="col-sm-9">
+                <a
+                  href={table.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary"
+                >
+                  {table.source_url}
+                </a>
+              </dd>
+            </>
+          )}
+          {table.license && (
+            <>
+              <dt className="col-sm-3 text-muted">ライセンス:</dt>
+              <dd className="col-sm-9">{table.license}</dd>
+            </>
+          )}
+        </dl>
+      </div>
       <ColumnTable columns={table.columns} />
     </div>
   );
@@ -383,7 +387,80 @@ const SelectedData: React.FC<SelectedDataProps> = ({
   );
 };
 
-const GROUP_LABEL = "国土数値情報＆国勢調査";
+// Group configuration
+const GROUPS = {
+  KOKUDO: "国土数値情報",
+  ESTAT: "国勢調査",
+} as const;
+
+// Function to determine which group a table belongs to
+const getTableGroup = (tableName: string): keyof typeof GROUPS => {
+  if (tableName.startsWith("jp_estat_")) {
+    return "ESTAT";
+  }
+  return "KOKUDO";
+};
+
+// Group section component
+interface GroupSectionProps {
+  groupKey: keyof typeof GROUPS;
+  groupLabel: string;
+  tables: Table[];
+  expanded: { [key: string]: boolean };
+  selectedTables: Table[];
+  onToggleExpand: (key: string) => void;
+  onToggleSelection: (table: Table) => void;
+}
+
+const GroupSection: React.FC<GroupSectionProps> = ({
+  groupKey,
+  groupLabel,
+  tables,
+  expanded,
+  selectedTables,
+  onToggleExpand,
+  onToggleSelection,
+}) => {
+  return (
+    <li key={groupKey} className="list-group-item">
+      <div
+        className="d-flex align-items-center mb-1"
+        style={{ cursor: "pointer" }}
+        onClick={() => onToggleExpand(groupLabel)}
+      >
+        <button
+          className="btn btn-sm me-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleExpand(groupLabel);
+          }}
+          aria-label={expanded[groupLabel] ? "折りたたむ" : "展開"}
+          tabIndex={-1}
+        >
+          {expanded[groupLabel] ? <CaretDownFill /> : <CaretRightFill />}
+        </button>
+        <span className="fw-bold">{groupLabel}</span>
+        <span className="text-muted ms-2">[{tables.length}テーブル]</span>
+      </div>
+      {expanded[groupLabel] && (
+        <ul className="list-group list-group-flush ms-4">
+          {tables.map((table) => (
+            <TableItem
+              key={table.table_name}
+              table={table}
+              isExpanded={expanded[table.table_name]}
+              isSelected={selectedTables.some(
+                (t) => t.table_name === table.table_name,
+              )}
+              onToggleExpand={onToggleExpand}
+              onToggleSelection={onToggleSelection}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+};
 
 const DataNavigatorPage: React.FC = () => {
   const { data, error, isLoading } = useSWR<TableListResponse>(
@@ -399,7 +476,9 @@ const DataNavigatorPage: React.FC = () => {
   useEffect(() => {
     if (!data) return;
     const expanded: { [key: string]: boolean } = {};
-    expanded[GROUP_LABEL] = true;
+    // Set both groups as expanded by default
+    expanded[GROUPS.KOKUDO] = true;
+    expanded[GROUPS.ESTAT] = true;
     data.tables.forEach((table) => {
       expanded[table.table_name] = false;
     });
@@ -436,6 +515,21 @@ const DataNavigatorPage: React.FC = () => {
       .filter(Boolean) as Table[];
     setFilteredTables(filtered);
   }, [search, data]);
+
+  // Group tables by their category
+  const groupedTables = React.useMemo(() => {
+    const groups: { [key in keyof typeof GROUPS]: Table[] } = {
+      KOKUDO: [],
+      ESTAT: [],
+    };
+
+    filteredTables.forEach((table) => {
+      const group = getTableGroup(table.table_name);
+      groups[group].push(table);
+    });
+
+    return groups;
+  }, [filteredTables]);
 
   const toggleExpand = (key: string) => {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -497,37 +591,18 @@ const DataNavigatorPage: React.FC = () => {
                     結果が見つかりません。
                   </li>
                 )}
-                <li key={GROUP_LABEL} className="list-group-item">
-                  <div className="d-flex align-items-center mb-1">
-                    <button
-                      className="btn btn-sm btn-outline-secondary me-2"
-                      onClick={() => toggleExpand(GROUP_LABEL)}
-                      aria-label={expanded[GROUP_LABEL] ? "折りたたむ" : "展開"}
-                    >
-                      {expanded[GROUP_LABEL] ? "-" : "+"}
-                    </button>
-                    <span className="fw-bold">{GROUP_LABEL}</span>
-                    <span className="text-muted ms-2">
-                      [{filteredTables.length}テーブル]
-                    </span>
-                  </div>
-                  {expanded[GROUP_LABEL] && (
-                    <ul className="list-group list-group-flush ms-4">
-                      {filteredTables.map((table) => (
-                        <TableItem
-                          key={table.table_name}
-                          table={table}
-                          isExpanded={expanded[table.table_name]}
-                          isSelected={selectedTables.some(
-                            (t) => t.table_name === table.table_name,
-                          )}
-                          onToggleExpand={toggleExpand}
-                          onToggleSelection={toggleTableSelection}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </li>
+                {Object.entries(GROUPS).map(([groupKey, groupLabel]) => (
+                  <GroupSection
+                    key={groupKey}
+                    groupKey={groupKey as keyof typeof GROUPS}
+                    groupLabel={groupLabel}
+                    tables={groupedTables[groupKey as keyof typeof GROUPS]}
+                    expanded={expanded}
+                    selectedTables={selectedTables}
+                    onToggleExpand={toggleExpand}
+                    onToggleSelection={toggleTableSelection}
+                  />
+                ))}
               </ul>
             </div>
           </div>
