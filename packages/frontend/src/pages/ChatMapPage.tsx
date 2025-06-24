@@ -1,14 +1,23 @@
-import React from "react";
+import React, { useEffect } from "react";
 import ChatBox from "./ChatMapPage/ChatBox";
 import MainMap from "./ChatMapPage/MainMap";
 import LayerSelector from "./ChatMapPage/LayerSelector";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { detailPaneVisibleAtom } from "./ChatMapPage/atoms";
+import { clearConversationStateAtom } from "../atoms/conversation";
 import "./ChatMapPage/style.scss";
 import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
 
 const ChatMapPage: React.FC = () => {
   const detailPaneVisible = useAtomValue(detailPaneVisibleAtom);
+  const clearConversationState = useSetAtom(clearConversationStateAtom);
+
+  // Clear conversation state when component unmounts
+  useEffect(() => {
+    return () => {
+      clearConversationState();
+    };
+  }, [clearConversationState]);
 
   return (
     <div className="container-fluid overflow-hidden">

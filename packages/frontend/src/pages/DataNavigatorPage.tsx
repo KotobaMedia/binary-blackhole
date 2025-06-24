@@ -348,7 +348,7 @@ const SelectedData: React.FC<SelectedDataProps> = ({
               className="btn btn-sm btn-outline-secondary"
               onClick={onClearAll}
             >
-              すべてクリア
+              クリア
             </button>
           )}
         </div>

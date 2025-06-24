@@ -8,9 +8,14 @@ import useSWR, { useSWRConfig } from "swr";
 import { format as formatSQL } from "sql-formatter";
 import { useLocation, useRoute } from "wouter";
 import { layersAtom, SQLLayer } from "./atoms";
-import { useSetAtom } from "jotai";
+import { useSetAtom, useAtomValue } from "jotai";
 import Header from "../../components/Header";
 import { fetcher, streamJsonLines } from "../../tools/api";
+import {
+  initialMessageAtom,
+  isInitialMessageSentAtom,
+  markInitialMessageSentAtom,
+} from "../../atoms/conversation";
 
 // Types for the API response data
 type Role = "user" | "assistant" | "system" | "tool";
@@ -216,6 +221,10 @@ const ChatBox: React.FC = () => {
     mutate,
   } = useSWR<ThreadDetails>(threadId ? `/threads/${threadId}` : null, fetcher);
 
+  const initialMessage = useAtomValue(initialMessageAtom);
+  const isInitialMessageSent = useAtomValue(isInitialMessageSentAtom);
+  const markInitialMessageSent = useSetAtom(markInitialMessageSentAtom);
+
   // Hidden console API to archive the thread
   useEffect(() => {
     if (!threadId) return;
@@ -328,6 +337,28 @@ const ChatBox: React.FC = () => {
     },
     [threadId, globalMutate, apiUrl, setThreadId, mutate],
   );
+
+  // Handle initial message from landing page
+  useEffect(() => {
+    if (
+      initialMessage &&
+      !isInitialMessageSent &&
+      !isSending &&
+      !threadDetails?.archived
+    ) {
+      // Send the initial message
+      handleSendMessage(initialMessage);
+      // Mark it as sent to prevent duplicate sends
+      markInitialMessageSent();
+    }
+  }, [
+    initialMessage,
+    isInitialMessageSent,
+    isSending,
+    threadDetails?.archived,
+    handleSendMessage,
+    markInitialMessageSent,
+  ]);
 
   let messages: JSX.Element[] = [];
 

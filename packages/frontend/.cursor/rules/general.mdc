@@ -3,12 +3,16 @@ description:
 globs:
 alwaysApply: true
 ---
+# UI Language
+
+The main language is Japanese.
+
 # Bootstrap Style Guide
 
 When working on the frontend, always use [Bootstrap](mdc:https:/getbootstrap.com) styles and components as much as possible. This includes:
 
 - Prefer using Bootstrap utility classes (e.g., `container`, `row`, `col`, `btn`, `form-control`, etc.) for layout, spacing, and UI elements.
-- The app uses a dark style with Bootstrap dark styling, so don't use any absolute color references.
+- The app uses Bootstrap light / dark themes, so don't use any absolute color references.
 - Use Bootstrap's built-in components (cards, forms, buttons, alerts, etc.) before creating custom styles.
 - Only write custom CSS or use non-Bootstrap components if the required design cannot be achieved with Bootstrap.
 - Reference Bootstrap documentation for class names and usage examples.
