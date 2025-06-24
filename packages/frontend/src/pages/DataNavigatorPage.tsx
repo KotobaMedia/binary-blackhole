@@ -6,7 +6,13 @@ import {
   CaretDownFill,
   CaretRightFill,
   Table as TableIcon,
+  Clipboard2Plus,
+  Clipboard2Check,
+  XCircle,
 } from "react-bootstrap-icons";
+import { useLocation } from "wouter";
+import { useSetAtom } from "jotai";
+import { setInitialMessageAtom } from "../atoms/conversation";
 
 // Types for API response
 interface Column {
@@ -380,7 +386,7 @@ const SelectedData: React.FC<SelectedDataProps> = ({
           disabled={selectedTables.length === 0}
           onClick={onProceed}
         >
-          進む
+          会話を始める
         </button>
       </div>
     </div>
@@ -471,6 +477,8 @@ const DataNavigatorPage: React.FC = () => {
   const [selectedTables, setSelectedTables] = useState<Table[]>([]);
   const [search, setSearch] = useState("");
   const [filteredTables, setFilteredTables] = useState<Table[]>([]);
+  const [, setLocation] = useLocation();
+  const setInitialMessage = useSetAtom(setInitialMessageAtom);
 
   // When data loads, set default expanded state
   useEffect(() => {
@@ -547,10 +555,25 @@ const DataNavigatorPage: React.FC = () => {
   };
 
   const handleProceed = () => {
-    const tableNames = selectedTables.map(
-      (table) => table.name || table.table_name,
-    );
-    alert("ChatMapPageに進みます。テーブル: " + tableNames.join(", "));
+    if (selectedTables.length === 0) return;
+
+    // Create a formatted message with the selected datasets
+    const datasetList = selectedTables
+      .map((table) => {
+        const geometryType = getGeometryType(table);
+        const geometryInfo = geometryType ? ` (${geometryType})` : "";
+        const description = table.desc ? ` - ${table.desc}` : "";
+        return `* ${table.name || table.table_name}${geometryInfo}${description}`;
+      })
+      .join("\n");
+
+    const message = `Focus on these data sets:\n${datasetList}`;
+
+    // Set the initial message in global state
+    setInitialMessage(message);
+
+    // Navigate to chat page
+    setLocation("/chat");
   };
 
   const handleRemoveTable = (table: Table) => {
