@@ -282,7 +282,7 @@ const TableItem: React.FC<TableItemProps> = ({
         className="p-3"
         style={{ cursor: "pointer", display: "flex", alignItems: "center" }}
         onClick={(e) => {
-          if ((e.target as HTMLElement).closest(".form-check-input")) return;
+          if ((e.target as HTMLElement).closest(".selection-icon")) return;
           onToggleExpand(table.table_name);
         }}
       >
@@ -290,15 +290,28 @@ const TableItem: React.FC<TableItemProps> = ({
           className="d-flex align-items-center mb-1 flex-grow-1"
           style={{ width: "100%" }}
         >
-          <div className="form-check me-2">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id={`table-${table.table_name}`}
-              checked={isSelected}
-              onChange={() => onToggleSelection(table)}
-              onClick={(e) => e.stopPropagation()}
-            />
+          <div className="me-2">
+            <button
+              className={clsx(
+                "btn btn-outline-secondary d-flex justify-content-center align-items-center p-0 selection-icon",
+                {
+                  "text-bg-success": isSelected,
+                },
+              )}
+              style={{ width: "2rem", height: "2rem", borderRadius: "0.5rem" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelection(table);
+              }}
+              aria-label={isSelected ? "選択解除" : "選択"}
+              title={isSelected ? "選択解除" : "選択"}
+            >
+              {isSelected ? (
+                <Clipboard2Check size="1rem" />
+              ) : (
+                <Clipboard2Plus size="1rem" />
+              )}
+            </button>
           </div>
           <button
             className="btn btn-sm me-2"
@@ -351,7 +364,7 @@ const SelectedData: React.FC<SelectedDataProps> = ({
           <h5 className="card-title mb-0">選択されたテーブル</h5>
           {selectedTables.length > 0 && (
             <button
-              className="btn btn-sm btn-outline-secondary"
+              className="btn btn-sm btn-outline-secondary px-2 py-0"
               onClick={onClearAll}
             >
               クリア
@@ -371,11 +384,16 @@ const SelectedData: React.FC<SelectedDataProps> = ({
               >
                 <span>{table.name || table.table_name}</span>
                 <button
-                  className="btn btn-sm btn-outline-danger"
+                  className="btn text-bg-danger d-flex justify-content-center align-items-center p-0"
+                  style={{
+                    width: "2rem",
+                    height: "2rem",
+                    borderRadius: "0.5rem",
+                  }}
                   onClick={() => onRemoveTable(table)}
                   aria-label={`${table.name || table.table_name}を削除`}
                 >
-                  ×
+                  <XCircle size="1rem" />
                 </button>
               </li>
             ))}
