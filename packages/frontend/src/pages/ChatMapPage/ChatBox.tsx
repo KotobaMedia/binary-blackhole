@@ -1,4 +1,4 @@
-import React, { JSX, useCallback, useState, useRef, useEffect } from "react";
+import React, { useCallback, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -6,16 +6,11 @@ import rehypeKatex from "rehype-katex";
 import { QuestionCircleFill } from "react-bootstrap-icons";
 import useSWR, { useSWRConfig } from "swr";
 import { format as formatSQL } from "sql-formatter";
-import { useLocation, useRoute } from "wouter";
 import { layersAtom, SQLLayer } from "./atoms";
-import { useSetAtom, useAtomValue } from "jotai";
+import { useSetAtom } from "jotai";
 import Header from "../../components/Header";
 import { fetcher, streamJsonLines } from "../../tools/api";
-import {
-  initialMessageAtom,
-  isInitialMessageSentAtom,
-  markInitialMessageSentAtom,
-} from "../../atoms/conversation";
+import { archiveThread } from "../../tools/threads";
 
 // Types for the API response data
 type Role = "user" | "assistant" | "system" | "tool";
@@ -56,10 +51,133 @@ type ThreadDetails = {
   archived?: boolean;
 };
 
-type CreateThreadResponse = {
-  thread_id: string;
+// Optimistic message type for local state
+type OptimisticMessage = {
+  id: string; // Temporary ID for optimistic messages
+  content: ChatterMessageView;
+  isOptimistic: true;
+  timestamp: number;
 };
 
+// Combined message type for rendering
+type RenderMessage = Message | OptimisticMessage;
+
+// Custom hook for managing chat state and operations
+const useChatState = (threadId: string) => {
+  const [optimisticMessages, setOptimisticMessages] = useState<
+    OptimisticMessage[]
+  >([]);
+  const [isSending, setIsSending] = useState(false);
+  const { mutate: globalMutate } = useSWRConfig();
+
+  const {
+    data: threadDetails,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<ThreadDetails>(`/threads/${threadId}`, fetcher);
+
+  // Combine server messages with optimistic messages
+  const allMessages: RenderMessage[] = [
+    ...(threadDetails?.messages || []),
+    ...optimisticMessages,
+  ].sort((a, b) => {
+    // Sort by timestamp for optimistic messages, by id for server messages
+    const aTime = "timestamp" in a ? a.timestamp : a.id;
+    const bTime = "timestamp" in b ? b.timestamp : b.id;
+    return aTime - bTime;
+  });
+
+  const addOptimisticMessage = useCallback((content: ChatterMessageView) => {
+    const optimisticMessage: OptimisticMessage = {
+      id: `optimistic-${Date.now()}-${Math.random()}`,
+      content,
+      isOptimistic: true,
+      timestamp: Date.now(),
+    };
+    setOptimisticMessages((prev) => [...prev, optimisticMessage]);
+    return optimisticMessage.id;
+  }, []);
+
+  const removeOptimisticMessage = useCallback((id: string) => {
+    setOptimisticMessages((prev) => prev.filter((msg) => msg.id !== id));
+  }, []);
+
+  const sendMessage = useCallback(
+    async (message: string) => {
+      setIsSending(true);
+
+      // Add optimistic user message immediately
+      const optimisticId = addOptimisticMessage({
+        message,
+        role: "user",
+      });
+
+      try {
+        const mutateKey = `/threads/${threadId}`;
+
+        // Remove optimistic message once we start getting real messages
+        removeOptimisticMessage(optimisticId);
+
+        const messageStream = streamJsonLines<Message>(
+          `/threads/${threadId}/message`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: message,
+            }),
+          },
+        );
+
+        for await (const message of messageStream) {
+          globalMutate<ThreadDetails>(
+            mutateKey,
+            (prevData) => {
+              if (!prevData) return prevData;
+              const newMessages = [...prevData.messages, message];
+              return {
+                ...prevData,
+                messages: newMessages,
+              };
+            },
+            false,
+          );
+        }
+
+        globalMutate(mutateKey);
+      } catch (error) {
+        console.error("Error sending message:", error);
+        // Remove optimistic message on error
+        removeOptimisticMessage(optimisticId);
+        mutate();
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [
+      threadId,
+      globalMutate,
+      mutate,
+      addOptimisticMessage,
+      removeOptimisticMessage,
+    ],
+  );
+
+  return {
+    allMessages,
+    isSending,
+    isLoading,
+    error,
+    threadDetails,
+    sendMessage,
+    mutate,
+  };
+};
+
+// Message rendering components
 const AssistantMessage: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <div className="d-flex justify-content-start mb-2">
@@ -83,6 +201,76 @@ const UserMessage: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
+// Message renderer component
+const MessageRenderer: React.FC<{ message: RenderMessage }> = ({ message }) => {
+  const { content } = message;
+  const isOptimistic = "isOptimistic" in message;
+
+  if (content.role === "user") {
+    return (
+      <UserMessage key={message.id}>
+        {content.message}
+        {isOptimistic && (
+          <div className="small text-muted mt-1">
+            <span
+              className="spinner-border spinner-border-sm me-1"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            送信中...
+          </div>
+        )}
+      </UserMessage>
+    );
+  } else if (content.role === "assistant") {
+    return (
+      <AssistantMessage key={message.id}>
+        <ReactMarkdown
+          remarkPlugins={[remarkMath, remarkGfm]}
+          rehypePlugins={[rehypeKatex]}
+          components={{
+            table: ({ node: _node, ...props }) => (
+              <table className="table" {...props} />
+            ),
+          }}
+        >
+          {content.message}
+        </ReactMarkdown>
+      </AssistantMessage>
+    );
+  } else if (content.role === "tool" && content.sidecar === "DatabaseLookup") {
+    return (
+      <AssistantMessage key={message.id}>
+        <strong>データベース確認中...</strong>
+      </AssistantMessage>
+    );
+  } else if (
+    content.role === "tool" &&
+    isSidecarSQLExecution(content.sidecar)
+  ) {
+    let sqlText = content.sidecar.SQLExecution.sql;
+    try {
+      sqlText = formatSQL(content.sidecar.SQLExecution.sql, {
+        language: "postgresql",
+        tabWidth: 2,
+        keywordCase: "upper",
+      });
+    } catch (e) {
+      console.error("Error formatting SQL:", e);
+    }
+    return (
+      <AssistantMessage key={message.id}>
+        <strong>SQL:</strong>
+        <pre>
+          <code>{sqlText}</code>
+        </pre>
+      </AssistantMessage>
+    );
+  }
+  return null;
+};
+
+// Send message box component
 type SendMessageBoxProps = {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
@@ -94,7 +282,6 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Add effect to focus textarea when isLoading changes from true to false
   useEffect(() => {
     if (!isLoading && textareaRef.current) {
       textareaRef.current.focus();
@@ -111,7 +298,6 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
 
       onSendMessage(message);
 
-      // Clear and reset the textarea
       textareaRef.current.value = "";
       textareaRef.current.style.height = "auto";
     },
@@ -119,13 +305,11 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Don't intercept key events during IME composition
     if (e.nativeEvent.isComposing || e.key === "Process") {
       return;
     }
 
     if (e.key === "Enter") {
-      // Prevent submission when Shift is pressed (creating new line)
       if (e.shiftKey) {
         return;
       }
@@ -137,7 +321,6 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
         textareaRef.current.value.trim() &&
         !isLoading
       ) {
-        // Call the form's submit handler to reuse the existing logic
         const form = e.currentTarget.closest("form");
         if (form) {
           form.requestSubmit();
@@ -149,7 +332,7 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
   const onInput = useCallback<React.FormEventHandler<HTMLTextAreaElement>>(
     (e) => {
       const el = e.currentTarget;
-      const maxHeight = 150; // maximum height in pixels
+      const maxHeight = 150;
       el.style.height = "auto";
       if (el.scrollHeight < maxHeight) {
         el.style.height = `${el.scrollHeight}px`;
@@ -191,176 +374,33 @@ const SendMessageBox: React.FC<SendMessageBoxProps> = ({
   );
 };
 
-const useThreadId = () => {
-  const [match, params] = useRoute("/chats/:threadId");
-  return match ? params.threadId : null;
-};
-const useSetThreadId = () => {
-  const [_, navigate] = useLocation();
-  return useCallback(
-    (id: string) => {
-      navigate(`/chats/${id}`);
-    },
-    [navigate],
-  );
+// Main ChatBox component
+type ChatBoxProps = {
+  threadId: string;
 };
 
-const ChatBox: React.FC = () => {
-  const threadId = useThreadId();
-  const setThreadId = useSetThreadId();
+const ChatBox: React.FC<ChatBoxProps> = ({ threadId }) => {
   const setLayers = useSetAtom(layersAtom);
-  const [isSending, setIsSending] = useState(false);
-  const apiUrl = import.meta.env.VITE_API_URL;
   const messageContainerRef = useRef<HTMLDivElement>(null);
+  const hasSentInitialMessage = useRef(false);
 
-  const { mutate: globalMutate } = useSWRConfig();
   const {
-    data: threadDetails,
-    error,
+    allMessages,
+    isSending,
     isLoading,
+    error,
+    threadDetails,
+    sendMessage,
     mutate,
-  } = useSWR<ThreadDetails>(threadId ? `/threads/${threadId}` : null, fetcher);
-
-  const initialMessage = useAtomValue(initialMessageAtom);
-  const isInitialMessageSent = useAtomValue(isInitialMessageSentAtom);
-  const markInitialMessageSent = useSetAtom(markInitialMessageSentAtom);
-
-  // Hidden console API to archive the thread
-  useEffect(() => {
-    if (!threadId) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__archiveThread = async () => {
-      if (threadDetails?.archived) {
-        console.warn("Thread is already archived");
-        return;
-      }
-
-      const response = await fetch(`${apiUrl}/threads/${threadId}/archive`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        console.error("Failed to archive thread");
-        return;
-      }
-
-      mutate((prevData) => {
-        if (!prevData) return prevData;
-        return {
-          ...prevData,
-          archived: true,
-        };
-      }, false);
-    };
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__archiveThread = undefined;
-    };
-  }, [threadId, mutate, threadDetails?.archived, apiUrl]);
+  } = useChatState(threadId);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (messageContainerRef.current && threadDetails?.messages.length) {
+    if (messageContainerRef.current && allMessages.length) {
       messageContainerRef.current.scrollTop =
         messageContainerRef.current.scrollHeight;
     }
-  }, [threadDetails?.messages]);
-
-  const handleSendMessage = useCallback(
-    async (message: string) => {
-      setIsSending(true);
-
-      try {
-        let createdThreadId = threadId;
-        if (!threadId) {
-          const response = await fetch(`${apiUrl}/threads`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({}),
-          });
-
-          if (!response.ok) throw new Error("Failed to create thread");
-
-          const data: CreateThreadResponse = await response.json();
-          createdThreadId = data.thread_id;
-          // If we created a new thread, update the URL
-          setThreadId(createdThreadId);
-        }
-        if (!createdThreadId) throw new Error("Failed to create thread");
-        const mutateKey = `/threads/${createdThreadId}`;
-
-        const messageStream = streamJsonLines<Message>(
-          `/threads/${createdThreadId}/message`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              content: message,
-            }),
-          },
-        );
-        for await (const message of messageStream) {
-          // Optimistically update the UI with the new message
-          // Note we use globalMutate because it could be a new thread, and the
-          // local mutate may not be available yet.
-          globalMutate<ThreadDetails>(
-            mutateKey,
-            (prevData) => {
-              if (!prevData) return prevData;
-              const newMessages = [...prevData.messages, message];
-              return {
-                ...prevData,
-                messages: newMessages,
-              };
-            },
-            false,
-          );
-        }
-
-        // After we get the last message, everything should be in sync, but we'll run a mutate just in case.
-        globalMutate(mutateKey);
-      } catch (error) {
-        console.error("Error sending message:", error);
-        // If there was an error, revalidate to restore the correct state
-        mutate();
-      } finally {
-        setIsSending(false);
-      }
-    },
-    [threadId, globalMutate, apiUrl, setThreadId, mutate],
-  );
-
-  // Handle initial message from landing page
-  useEffect(() => {
-    if (
-      initialMessage &&
-      !isInitialMessageSent &&
-      !isSending &&
-      !threadDetails?.archived
-    ) {
-      // Send the initial message
-      handleSendMessage(initialMessage);
-      // Mark it as sent to prevent duplicate sends
-      markInitialMessageSent();
-    }
-  }, [
-    initialMessage,
-    isInitialMessageSent,
-    isSending,
-    threadDetails?.archived,
-    handleSendMessage,
-    markInitialMessageSent,
-  ]);
-
-  let messages: JSX.Element[] = [];
+  }, [allMessages]);
 
   // Set layers from data
   useEffect(() => {
@@ -370,9 +410,6 @@ const ChatBox: React.FC = () => {
       return;
     }
     const layers: SQLLayer[] = [];
-    // TODO: this currently overwrites the layers every time
-    // we get new data. We should probably merge them instead.
-    // also, save the enabled state between refreshes
     for (const message of messages) {
       const { content } = message;
       if (content.role === "tool" && isSidecarSQLExecution(content.sidecar)) {
@@ -388,66 +425,61 @@ const ChatBox: React.FC = () => {
     setLayers(layers);
   }, [threadDetails?.messages, setLayers]);
 
-  // Map the messages from the API response to UI components
-  if (threadDetails) {
-    messages = threadDetails.messages
-      .map((message) => {
-        const { content } = message;
+  // Hidden console API to archive the thread
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__archiveThread = async () => {
+      if (threadDetails?.archived) {
+        console.warn("Thread is already archived");
+        return;
+      }
 
-        if (content.role === "user") {
-          return <UserMessage key={message.id}>{content.message}</UserMessage>;
-        } else if (content.role === "assistant") {
-          return (
-            <AssistantMessage key={message.id}>
-              <ReactMarkdown
-                remarkPlugins={[remarkMath, remarkGfm]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  table: ({ node: _node, ...props }) => (
-                    <table className="table" {...props} />
-                  ),
-                }}
-              >
-                {content.message}
-              </ReactMarkdown>
-            </AssistantMessage>
-          );
-        } else if (
-          content.role === "tool" &&
-          content.sidecar === "DatabaseLookup"
-        ) {
-          return (
-            <AssistantMessage key={message.id}>
-              <strong>データベース確認中...</strong>
-            </AssistantMessage>
-          );
-        } else if (
-          content.role === "tool" &&
-          isSidecarSQLExecution(content.sidecar)
-        ) {
-          let sqlText = content.sidecar.SQLExecution.sql;
-          try {
-            sqlText = formatSQL(content.sidecar.SQLExecution.sql, {
-              language: "postgresql",
-              tabWidth: 2,
-              keywordCase: "upper",
-            });
-          } catch (e) {
-            console.error("Error formatting SQL:", e);
-          }
-          return (
-            <AssistantMessage key={message.id}>
-              <strong>SQL:</strong>
-              <pre>
-                <code>{sqlText}</code>
-              </pre>
-            </AssistantMessage>
-          );
-        }
-        return null;
-      })
-      .filter(Boolean) as JSX.Element[];
-  }
+      try {
+        await archiveThread(threadId);
+        mutate((prevData) => {
+          if (!prevData) return prevData;
+          return {
+            ...prevData,
+            archived: true,
+          };
+        }, false);
+      } catch (error) {
+        console.error("Failed to archive thread:", error);
+      }
+    };
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__archiveThread = undefined;
+    };
+  }, [threadId, mutate, threadDetails?.archived]);
+
+  // Get initial message from navigation state
+  const getInitialMessage = () => {
+    const state = history.state as { initialMessage?: string } | null;
+    return state?.initialMessage || null;
+  };
+
+  // Reset initial message flag when threadId changes
+  useEffect(() => {
+    hasSentInitialMessage.current = false;
+  }, [threadId]);
+
+  // Simple initial message handling - send once when ready, then clear
+  useEffect(() => {
+    const initialMessage = getInitialMessage();
+
+    if (
+      initialMessage &&
+      !hasSentInitialMessage.current &&
+      threadDetails &&
+      !threadDetails.archived
+    ) {
+      hasSentInitialMessage.current = true;
+      sendMessage(initialMessage);
+      // Clear the state after sending
+      history.replaceState(null, "", window.location.href);
+    }
+  }, [threadDetails, sendMessage]);
 
   return (
     <div
@@ -455,8 +487,9 @@ const ChatBox: React.FC = () => {
       className="d-flex flex-column h-100 overflow-y-auto overflow-x-hidden px-3"
     >
       <Header />
+
       <div className="d-flex flex-column flex-grow-1">
-        {isLoading && threadId && (
+        {isLoading && (
           <div className="text-center p-3">
             <div className="spinner-border text-primary" role="status">
               <span className="visually-hidden">Loading...</span>
@@ -470,15 +503,14 @@ const ChatBox: React.FC = () => {
           </div>
         )}
 
-        {messages}
+        {allMessages.map((message) => (
+          <MessageRenderer key={message.id} message={message} />
+        ))}
       </div>
 
       {!threadDetails?.archived && (
         <div className="position-sticky bottom-0 mt-auto py-3 bg-body bg-opacity-75">
-          <SendMessageBox
-            onSendMessage={handleSendMessage}
-            isLoading={isSending}
-          />
+          <SendMessageBox onSendMessage={sendMessage} isLoading={isSending} />
         </div>
       )}
     </div>

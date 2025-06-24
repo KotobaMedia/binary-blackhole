@@ -11,8 +11,7 @@ import {
   XCircle,
 } from "react-bootstrap-icons";
 import { useLocation } from "wouter";
-import { useSetAtom } from "jotai";
-import { setInitialMessageAtom } from "../atoms/conversation";
+import { createThread } from "../tools/threads";
 
 // Types for API response
 interface Column {
@@ -496,7 +495,6 @@ const DataNavigatorPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [filteredTables, setFilteredTables] = useState<Table[]>([]);
   const [, setLocation] = useLocation();
-  const setInitialMessage = useSetAtom(setInitialMessageAtom);
 
   // When data loads, set default expanded state
   useEffect(() => {
@@ -572,7 +570,7 @@ const DataNavigatorPage: React.FC = () => {
     });
   };
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
     if (selectedTables.length === 0) return;
 
     // Create a formatted message with the selected datasets
@@ -580,18 +578,24 @@ const DataNavigatorPage: React.FC = () => {
       .map((table) => {
         const geometryType = getGeometryType(table);
         const geometryInfo = geometryType ? ` (${geometryType})` : "";
-        const description = table.desc ? ` - ${table.desc}` : "";
-        return `* ${table.name || table.table_name}${geometryInfo}${description}`;
+        const description = table.name ? ` - ${table.name}` : "";
+        return `* ${table.table_name}${geometryInfo}${description}`;
       })
       .join("\n");
 
-    const message = `Focus on these data sets:\n${datasetList}`;
+    const message = `このデータセットに集中してください:\n${datasetList}\n\nどの様なクエリーが良いか、考えてみてください。`;
 
-    // Set the initial message in global state
-    setInitialMessage(message);
+    try {
+      // Create a new thread first
+      const threadId = await createThread();
 
-    // Navigate to chat page
-    setLocation("/chat");
+      // Navigate to chat page with initial message in state
+      setLocation(`/chats/${threadId}`, {
+        state: { initialMessage: message },
+      });
+    } catch (error) {
+      console.error("Failed to create thread:", error);
+    }
   };
 
   const handleRemoveTable = (table: Table) => {

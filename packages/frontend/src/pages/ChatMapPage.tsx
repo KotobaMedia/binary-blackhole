@@ -1,29 +1,24 @@
-import React, { useEffect } from "react";
+import React from "react";
 import ChatBox from "./ChatMapPage/ChatBox";
 import MainMap from "./ChatMapPage/MainMap";
 import LayerSelector from "./ChatMapPage/LayerSelector";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue } from "jotai";
 import { detailPaneVisibleAtom } from "./ChatMapPage/atoms";
-import { clearConversationStateAtom } from "../atoms/conversation";
 import "./ChatMapPage/style.scss";
 import FeatureDetailsPanel from "./ChatMapPage/FeatureDetailsPanel";
 
-const ChatMapPage: React.FC = () => {
-  const detailPaneVisible = useAtomValue(detailPaneVisibleAtom);
-  const clearConversationState = useSetAtom(clearConversationStateAtom);
+type ChatMapPageProps = {
+  threadId: string;
+};
 
-  // Clear conversation state when component unmounts
-  useEffect(() => {
-    return () => {
-      clearConversationState();
-    };
-  }, [clearConversationState]);
+const ChatMapPage: React.FC<ChatMapPageProps> = ({ threadId }) => {
+  const detailPaneVisible = useAtomValue(detailPaneVisibleAtom);
 
   return (
     <div className="container-fluid overflow-hidden">
       <div className="row vh-100 vw-100 flex-nowrap chat-map-page-container">
         <div className="col-4 p-0 h-100">
-          <ChatBox />
+          <ChatBox threadId={threadId} />
         </div>
         <div className="col-8 p-0">
           <div className="d-flex flex-column h-100">

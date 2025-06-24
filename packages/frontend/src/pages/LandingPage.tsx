@@ -1,24 +1,34 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
-import { useSetAtom } from "jotai";
-import { setInitialMessageAtom } from "../atoms/conversation";
+import { createThread } from "../tools/threads";
 
 const LandingPage: React.FC = () => {
   const [, setLocation] = useLocation();
   const [conversationInput, setConversationInput] = useState("");
-  const setInitialMessage = useSetAtom(setInitialMessageAtom);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleExploreData = () => {
     setLocation("/data");
   };
 
-  const handleConversationSubmit = (e: React.FormEvent) => {
+  const handleConversationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (conversationInput.trim()) {
-      // Set the initial message in global state
-      setInitialMessage(conversationInput.trim());
-      // Navigate to chat page
-      setLocation("/chat");
+    if (conversationInput.trim() && !isSubmitting) {
+      setIsSubmitting(true);
+      try {
+        // Create a new thread first
+        const threadId = await createThread();
+
+        // Navigate to chat page with initial message in state
+        setLocation(`/chats/${threadId}`, {
+          state: { initialMessage: conversationInput.trim() },
+        });
+      } catch (error) {
+        console.error("Failed to create thread:", error);
+        // You might want to show an error message to the user here
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -55,9 +65,17 @@ const LandingPage: React.FC = () => {
                     <button
                       type="submit"
                       className="btn btn-outline-secondary btn-lg"
-                      disabled={!conversationInput.trim()}
+                      disabled={!conversationInput.trim() || isSubmitting}
                     >
-                      Go
+                      {isSubmitting ? (
+                        <span
+                          className="spinner-border spinner-border-sm"
+                          role="status"
+                          aria-hidden="true"
+                        ></span>
+                      ) : (
+                        "Go"
+                      )}
                     </button>
                   </div>
                 </form>
