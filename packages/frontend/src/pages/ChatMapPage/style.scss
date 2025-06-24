@@ -5,3 +5,9 @@
         border-top: 1px solid #dee2e6;
     }
 }
+
+.markdown-content {
+    p:last-child {
+        margin-bottom: 0;
+    }
+}

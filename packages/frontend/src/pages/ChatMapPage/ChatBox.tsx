@@ -209,7 +209,19 @@ const MessageRenderer: React.FC<{ message: RenderMessage }> = ({ message }) => {
   if (content.role === "user") {
     return (
       <UserMessage key={message.id}>
-        {content.message}
+        <div className="markdown-content">
+          <ReactMarkdown
+            remarkPlugins={[remarkMath, remarkGfm]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              table: ({ node: _node, ...props }) => (
+                <table className="table" {...props} />
+              ),
+            }}
+          >
+            {content.message}
+          </ReactMarkdown>
+        </div>
         {isOptimistic && (
           <div className="small text-muted mt-1">
             <span
@@ -225,17 +237,19 @@ const MessageRenderer: React.FC<{ message: RenderMessage }> = ({ message }) => {
   } else if (content.role === "assistant") {
     return (
       <AssistantMessage key={message.id}>
-        <ReactMarkdown
-          remarkPlugins={[remarkMath, remarkGfm]}
-          rehypePlugins={[rehypeKatex]}
-          components={{
-            table: ({ node: _node, ...props }) => (
-              <table className="table" {...props} />
-            ),
-          }}
-        >
-          {content.message}
-        </ReactMarkdown>
+        <div className="markdown-content">
+          <ReactMarkdown
+            remarkPlugins={[remarkMath, remarkGfm]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              table: ({ node: _node, ...props }) => (
+                <table className="table" {...props} />
+              ),
+            }}
+          >
+            {content.message}
+          </ReactMarkdown>
+        </div>
       </AssistantMessage>
     );
   } else if (content.role === "tool" && content.sidecar === "DatabaseLookup") {
