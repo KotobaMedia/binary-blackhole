@@ -6,6 +6,15 @@
     }
 }
 
+// Mobile-specific styles
+@media (max-width: 767.98px) {
+    .chat-map-page-container {
+        .detail-pane {
+            height: 200px; // Smaller height on mobile
+        }
+    }
+}
+
 .markdown-content {
     p:last-child {
         margin-bottom: 0;

@@ -2,6 +2,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import React, { useCallback } from "react";
 import { layersAtom, mergedLayersAtom } from "./atoms";
 import { ExclamationTriangleFill } from "react-bootstrap-icons";
+import clsx from "clsx";
 
 const LayerSelector: React.FC = () => {
   const layers = useAtomValue(mergedLayersAtom);
@@ -22,7 +23,7 @@ const LayerSelector: React.FC = () => {
   );
 
   return (
-    <div className="d-flex flex-wrap gap-2 p-2">
+    <div className={clsx("d-flex flex-wrap gap-2 p-2", { "d-none": !layers.length })}>
       {layers.map((layer) => (
         <button
           key={layer.name}
