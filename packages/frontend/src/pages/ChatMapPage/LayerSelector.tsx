@@ -23,7 +23,11 @@ const LayerSelector: React.FC = () => {
   );
 
   return (
-    <div className={clsx("d-flex flex-wrap gap-2 p-2", { "d-none": !layers.length })}>
+    <div
+      className={clsx("d-flex flex-wrap gap-2 p-2", {
+        "d-none": !layers.length,
+      })}
+    >
       {layers.map((layer) => (
         <button
           key={layer.name}

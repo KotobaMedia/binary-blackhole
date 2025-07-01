@@ -3,7 +3,10 @@ import ChatBox from "./ChatMapPage/ChatBox";
 import MainMap from "./ChatMapPage/MainMap";
 import LayerSelector from "./ChatMapPage/LayerSelector";
 import { useAtomValue, useSetAtom } from "jotai";
-import { detailPaneVisibleAtom, mobileMapVisibleAtom } from "./ChatMapPage/atoms";
+import {
+  detailPaneVisibleAtom,
+  mobileMapVisibleAtom,
+} from "./ChatMapPage/atoms";
 import { Map, ChatDots } from "react-bootstrap-icons";
 import clsx from "clsx";
 import "./ChatMapPage/style.scss";
@@ -76,12 +79,22 @@ const ChatMapPage: React.FC<ChatMapPageProps> = ({ threadId }) => {
         {/* Mobile Content - Always render both, show/hide with CSS */}
         <div className="flex-grow-1 position-relative">
           {/* Chat View */}
-          <div className={clsx("h-100", { "d-none": mobileMapVisible, "d-block": !mobileMapVisible })}>
+          <div
+            className={clsx("h-100", {
+              "d-none": mobileMapVisible,
+              "d-block": !mobileMapVisible,
+            })}
+          >
             <ChatBox threadId={threadId} />
           </div>
 
           {/* Map View */}
-          <div className={clsx("h-100", "d-flex", "flex-column", { "d-flex": mobileMapVisible, "d-none": !mobileMapVisible })}>
+          <div
+            className={clsx("h-100", "d-flex", "flex-column", {
+              "d-flex": mobileMapVisible,
+              "d-none": !mobileMapVisible,
+            })}
+          >
             <ExperimentalBanner />
             <div className="flex-grow-1 position-relative">
               <MainMap />
